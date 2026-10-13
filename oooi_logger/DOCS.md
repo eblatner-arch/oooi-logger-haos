@@ -38,7 +38,7 @@ Open **Flight Log → Settings** and set:
 
 ## Changing the CSV columns (optional)
 
-The CSVs use MyFlightbook's own column names by default, which is what its import expects. To change them, open **Flight Log → Settings → CSV columns**:
+The CSVs use MyFlightbook's own column names by default, which is what its import expects. They include only the columns the app fills in. To log something else, such as IMC or approaches, add your own column (below) set to **Fill in on the Log screen** and name it exactly as MyFlightbook does, for example `IMC` or `Approaches`. To change them, open **Flight Log → Settings → CSV columns**:
 
 - **Untick** a column to leave it out of the CSV.
 - **Type a new name** to rename its header, for example to match a custom flight property in your MyFlightbook account. Leave it blank to keep the default.

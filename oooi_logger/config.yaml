@@ -1,5 +1,5 @@
 name: OOOI Flight Logger
-version: "1.6.0"
+version: "1.7.0"
 slug: oooi_logger
 description: Scan the ACARS OOOI page, work out night time, and keep MyFlightbook import CSVs in Google Drive.
 url: https://github.com/eblatner-arch/oooi-logger-haos

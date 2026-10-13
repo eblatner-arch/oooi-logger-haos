@@ -1,3 +1,6 @@
+## 1.7.0
+- The CSV now contains only the columns the app fills in. Removed the always-empty Approaches, Hold, IMC, Simulated Instrument, Ground Simulator, Dual Received, and CFI columns. To log any of them, add your own column in **Settings → CSV columns** set to **Fill in on the Log screen**.
+
 ## 1.6.0
 - Added columns can now be **filled in on the Log screen**: each one gets its own box under Comments, with an optional pre-filled value for new flights.
 - Clearer explanation of the three kinds of added column in Settings.
