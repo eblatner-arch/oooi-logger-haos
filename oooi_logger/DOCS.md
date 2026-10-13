@@ -20,7 +20,7 @@ Log airline flights from the ACARS-PREVIOUS OOOI page and import them into MyFli
 | Option | What it is |
 |---|---|
 | `gemini_api_key` | Key from Google AI Studio. Needed for photo scanning. Stays on your HA box. |
-| `gemini_model` | Gemini model ID. Default `gemini-3.8-flash`. |
+| `gemini_model` | Gemini model ID. Default `gemini-3.5-flash-lite`. |
 | `google_client_id` | OAuth client ID (type **TVs and Limited Input devices**). Needed for Drive upload. |
 | `google_client_secret` | That client's secret. |
 | `drive_folder` | Drive folder name. Default `OOOI Logger (Home Assistant)`. |

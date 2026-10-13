@@ -71,7 +71,7 @@ def options():
     o = load('options.json', {})
     return {
         'gemini_api_key': (o.get('gemini_api_key') or '').strip(),
-        'gemini_model': (o.get('gemini_model') or 'gemini-3.8-flash').strip(),
+        'gemini_model': (o.get('gemini_model') or 'gemini-3.5-flash-lite').strip(),
         'google_client_id': (o.get('google_client_id') or '').strip(),
         'google_client_secret': (o.get('google_client_secret') or '').strip(),
         'drive_folder': (o.get('drive_folder') or 'OOOI Logger (Home Assistant)').strip(),
