@@ -33,6 +33,8 @@ GOOGLE_TOKEN = os.environ.get('OOOI_GOOGLE_TOKEN', 'https://oauth2.googleapis.co
 GOOGLE_DEVICE = os.environ.get('OOOI_GOOGLE_DEVICE', 'https://oauth2.googleapis.com/device/code')
 GEMINI_BASE = os.environ.get('OOOI_GEMINI', 'https://generativelanguage.googleapis.com/v1beta/models')
 DRIVE_BASE = os.environ.get('OOOI_DRIVE')  # test override for both Drive hosts
+AIRPORTS_URL = os.environ.get('OOOI_AIRPORTS_URL', 'https://raw.githubusercontent.com/mborsetti/airportsdata/main/airportsdata/airports.csv')
+MIN_AIRPORTS = 5000
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
 log = logging.getLogger('oooi')
@@ -421,6 +423,41 @@ def gemini_scan(jpeg):
         return 502, {'error': 'Gemini could not read the page clearly. Retake the photo straight on with less glare.'}
 
 
+# ---------------- Airport database ----------------
+def airports_info():
+    meta = load('airports_meta.json', {})
+    if meta.get('updated') and os.path.isfile(_path('airports.js')):
+        return {'source': 'updated', 'updated': meta['updated'], 'count': len(fm.AP)}
+    return {'source': 'bundled', 'updated': None, 'count': len(fm.AP)}
+
+
+def update_airports():
+    """Download the latest airport list, rebuild it, and switch to it if it looks sane."""
+    try:
+        _, body = http('GET', AIRPORTS_URL, timeout=120)
+    except HttpError as e:
+        raise RuntimeError(f'GitHub returned an error ({e.status}). Your current airport list is unchanged.')
+    except Exception as e:
+        raise RuntimeError(f'Could not download the airport list: {e}. Your current airport list is unchanged.')
+    try:
+        src, n = fm.build_airports_js(body.decode('utf-8'))
+        test = fm.parse_airports_js(src)
+    except Exception:
+        raise RuntimeError('The downloaded airport list was not in the expected format. Your current airport list is unchanged.')
+    if n < MIN_AIRPORTS or 'KEWR' not in test:
+        raise RuntimeError(f'The downloaded list only had {n} airports, which looks wrong. Your current airport list is unchanged.')
+    before = len(fm.AP)
+    with LOCK:
+        tmp = _path('airports.js.tmp')
+        with open(tmp, 'w', encoding='utf-8') as fh:
+            fh.write(src)
+        os.replace(tmp, _path('airports.js'))
+        fm.load_airports(_path('airports.js'))
+        save('airports_meta.json', {'updated': now_iso(), 'count': n, 'source_url': AIRPORTS_URL})
+    log.info('Airport database updated: %d airports (was %d)', n, before)
+    return {'count': n, 'before': before}
+
+
 # ---------------- API ----------------
 def state():
     o = options()
@@ -437,6 +474,7 @@ def state():
         },
         'scan': {'configured': bool(o['gemini_api_key']), 'model': o['gemini_model']},
         'share_path': SHARE,
+        'airports': airports_info(),
     }
 
 
@@ -493,10 +531,12 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
             return
-        # static files
+        # static files (an updated airport list in /data replaces the bundled one)
         rel = 'index.html' if p == '/' else p.lstrip('/')
         full = os.path.normpath(os.path.join(WWW, rel))
-        if not full.startswith(WWW) or not os.path.isfile(full):
+        if rel == 'js/airports.js' and os.path.isfile(_path('airports.js')) and load('airports_meta.json', {}).get('updated'):
+            full = _path('airports.js')
+        elif not full.startswith(WWW) or not os.path.isfile(full):
             self.send_error(404)
             return
         with open(full, 'rb') as fh:
@@ -589,6 +629,13 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(502, {'error': f'Google refused the sign-in request ({e.status}). Check the client ID and that its type is "TVs and Limited Input devices".'})
             except Exception as e:
                 return self._json(502, {'error': f'Could not reach Google: {e}'})
+        if p == '/api/airports/update':
+            try:
+                res = update_airports()
+            except RuntimeError as e:
+                return self._json(502, {'error': str(e)})
+            changed()
+            return self._json(200, {'ok': True, **res, 'airports': airports_info()})
         if p == '/api/drive/cancel':
             DEVICE['pending'] = None
             return self._json(200, {'ok': True})
@@ -611,6 +658,9 @@ class Handler(BaseHTTPRequestHandler):
 
 def main():
     os.makedirs(DATA, exist_ok=True)
+    if load('airports_meta.json', {}).get('updated') and os.path.isfile(_path('airports.js')):
+        fm.load_airports(_path('airports.js'))
+    log.info('Airport database: %d airports (%s)', len(fm.AP), airports_info()['source'])
     write_local_files()
     srv = ThreadingHTTPServer(('0.0.0.0', PORT), Handler)
     log.info('OOOI Flight Logger listening on %d (data %s, files %s)', PORT, DATA, SHARE)

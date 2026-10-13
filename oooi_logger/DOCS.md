@@ -11,6 +11,7 @@ Log airline flights from the ACARS-PREVIOUS OOOI page and import them into MyFli
   - `Flight Log – all flights.csv`: everything
   - `flights.json`: full backup
 - Flights live in the add-on's data folder, so Home Assistant backups include them.
+- **Settings → Update airport database** downloads the latest airport list to Home Assistant (kept in the add-on's data folder; the copy built into the add-on is the fallback).
 
 ## Configuration
 

@@ -264,7 +264,7 @@ function statusLine() {
 async function refresh() {
   const st = await api('GET', 'api/state');
   S.flights = st.flights || [];
-  S.drive = st.drive || {}; S.scan = st.scan || {};
+  S.drive = st.drive || {}; S.scan = st.scan || {}; S.airports = st.airports || {};
   const s = st.settings || {};
   S.cfg = { seat: s.seat || 'PIC', anonTail: s.anon_tail || '#002377', model: s.model || 'B737' };
   statusLine();
@@ -304,6 +304,10 @@ function renderSettings() {
     info.textContent = (d.last_error ? d.last_error + ' ' : '') + 'Connect your Google account once and the add-on uploads the CSVs to Drive after every change. It can only see files it creates.';
     $('connectGoogle').hidden = !!p; $('connectGoogle').textContent = 'Connect Google'; $('signOut').hidden = true; $('syncDrive2').hidden = true;
   }
+  const ap = S.airports || {};
+  $('airportInfo').textContent = ap.source === 'updated'
+    ? `${(ap.count || 0).toLocaleString()} airports, updated ${new Date(ap.updated).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}. Downloads the latest open-source airport list (airportsdata on GitHub) to your Home Assistant.`
+    : `${(ap.count || 0).toLocaleString()} airports from the copy built into the add-on. Update to download the latest open-source airport list (airportsdata on GitHub) to your Home Assistant.`;
   $('scanInfo').textContent = S.scan.configured
     ? `Gemini is set up in the add-on Configuration (model ${S.scan.model}). Photos go from Home Assistant to Gemini; the key never reaches your phone.`
     : 'Add gemini_api_key (and optionally gemini_model) in the add-on Configuration tab, then restart the add-on to turn on photo scanning.';
@@ -328,6 +332,14 @@ $('connectGoogle').onclick = async () => {
       if (!S.drive.pending || S.drive.pending.error) { clearInterval(S.poll); if (S.drive.connected && !S.drive.pending) { toast('Google Drive connected'); watchSync(); } }
     }, 3000);
   } catch (e) { toast(e.message); }
+};
+$('updateAirports').onclick = async () => {
+  const b = $('updateAirports'); b.disabled = true; b.textContent = 'Downloading…';
+  try {
+    const j = await api('POST', 'api/airports/update');
+    toast(`Airport database updated: ${j.count.toLocaleString()} airports`);
+    setTimeout(() => location.reload(), 1200);   // reload so this page uses the new list too
+  } catch (e) { toast(e.message); b.disabled = false; b.textContent = 'Update airport database'; }
 };
 $('copyCode').onclick = async () => { try { await navigator.clipboard.writeText($('devUser').textContent); toast('Code copied'); } catch (_) { toast('Select the code and copy it.'); } };
 $('cancelCode').onclick = async () => { clearInterval(S.poll); await api('POST', 'api/drive/cancel').catch(() => {}); await refresh(); renderSettings(); };

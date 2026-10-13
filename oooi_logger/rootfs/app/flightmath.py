@@ -2,6 +2,7 @@
 and the MyFlightbook import CSV. Mirrors www/js/core.js exactly."""
 import csv
 import io
+import json
 import math
 import os
 import re
@@ -12,9 +13,11 @@ RAD = math.pi / 180
 _HERE = os.path.dirname(os.path.abspath(__file__))
 
 
-def _load_airports():
-    src = open(os.path.join(_HERE, 'www', 'js', 'airports.js'), encoding='utf-8').read()
-    tzs = __import__('json').loads(re.search(r'const AP_TZ=(\[.*?\]);', src, re.S).group(1))
+BUNDLED_AIRPORTS = os.path.join(_HERE, 'www', 'js', 'airports.js')
+
+
+def parse_airports_js(src):
+    tzs = json.loads(re.search(r'const AP_TZ=(\[.*?\]);', src, re.S).group(1))
     raw = re.search(r'const AP_RAW="(.*?)";', src, re.S).group(1)
     out = {}
     for e in raw.split(';'):
@@ -23,7 +26,36 @@ def _load_airports():
     return out
 
 
-AP = _load_airports()
+def build_airports_js(csv_text):
+    """Turn the airportsdata CSV into the compact airports.js format (airline airports only)."""
+    rows = [r for r in csv.DictReader(io.StringIO(csv_text)) if r.get('iata') and len(r.get('icao') or '') == 4 and r.get('lat') and r.get('lon')]
+    tzs = sorted({r['tz'] for r in rows if r.get('tz')})
+    ti = {t: i for i, t in enumerate(tzs)}
+
+    def num(v):
+        s = f'{float(v):.3f}'.rstrip('0').rstrip('.')
+        return '0' if s in ('-0', '') else s
+
+    parts = [f"{r['icao']}{num(r['lat'])},{num(r['lon'])},{ti.get(r.get('tz') or '', 0)}" for r in rows if r.get('tz') in ti]
+    return 'const AP_TZ=' + json.dumps(tzs) + ';\nconst AP_RAW="' + ';'.join(parts) + '";\n', len(parts)
+
+
+def load_airports(path=None):
+    """Load airports from path (falls back to the bundled copy). Returns the count."""
+    global AP
+    for candidate in ([path] if path else []) + [BUNDLED_AIRPORTS]:
+        try:
+            with open(candidate, encoding='utf-8') as fh:
+                AP = parse_airports_js(fh.read())
+            return len(AP)
+        except Exception:
+            continue
+    AP = {}
+    return 0
+
+
+AP = {}
+load_airports()
 
 
 def sun_alt(ms, lat, lon):
