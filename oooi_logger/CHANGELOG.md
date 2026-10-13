@@ -1,3 +1,6 @@
+## 1.12.1
+- Fixed the Use / Header / Edit headings in Settings → CSV columns being clipped.
+
 ## 1.12.0
 - The CSV logs five times: Crew Start Time (CREW), Block Out Time (OUT), Flight Start (OFF), Flight End (ON), and Block In Time (IN). Removed Engine Start and Engine End, which only repeated OUT and IN.
 
