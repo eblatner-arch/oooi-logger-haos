@@ -7,6 +7,10 @@ const AP = (() => {
   }
   return m;
 })();
+// Airports whose ICAO code changed; old logbooks still use the old code (keep in step with flightmath.py).
+const FORMER_ICAO = { KPBI: 'KDJT' };  // Palm Beach International
+for (const [old, cur] of Object.entries(FORMER_ICAO)) if (!AP[old] && AP[cur]) AP[old] = AP[cur];
+const apCode = (c) => (FORMER_ICAO[c] && AP[FORMER_ICAO[c]] ? FORMER_ICAO[c] : c);
 
 const RAD = Math.PI / 180;
 

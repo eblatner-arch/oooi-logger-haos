@@ -25,7 +25,7 @@ function appEntries() {
   for (const f of S.flights || []) {
     const vals = csvValues(f, S.cfg); if (!vals) continue;
     const ov = f.override || {}, get = (k) => (k in ov ? ov[k] : vals[k]), n = (k) => +get(k) || 0;
-    out.push({ d: f.date, r: [f.from, f.to], t: n('Total Flight Time'), pic: n('PIC'), sic: n('SIC'), n: n('Night'), x: n('X-Country'),
+    out.push({ d: f.date, r: [apCode(f.from), apCode(f.to)], t: n('Total Flight Time'), pic: n('PIC'), sic: n('SIC'), n: n('Night'), x: n('X-Country'),
       l: n('Landings'), ld: n('FS Day Landings'), ln: n('FS Night Landings'), to: n('Takeoffs (any)'), ton: n('Takeoffs - Night'),
       reg: f.tail || '', m: S.cfg.model, fn: f.flightNumber || '', src: 'app' });
   }

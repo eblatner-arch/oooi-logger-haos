@@ -59,6 +59,19 @@ def build_airports_js(csv_text):
             + 'const AP_IATA="' + ';'.join(iata) + '";\n'), len(parts)
 
 
+# Airports whose ICAO code changed. Old logbooks still use the old code, so it is treated as
+# the new one everywhere (night math, history, stats, map). Add pairs here as codes change.
+FORMER_ICAO = {
+    'KPBI': 'KDJT',  # Palm Beach International
+}
+
+
+def _add_former_codes():
+    for old, new in FORMER_ICAO.items():
+        if old not in AP and new in AP:
+            AP[old] = AP[new]
+
+
 def load_airports(path=None):
     """Load airports from path (falls back to the bundled copy). Returns the count."""
     global AP, IATA
@@ -67,7 +80,9 @@ def load_airports(path=None):
             with open(candidate, encoding='utf-8') as fh:
                 src = fh.read()
             AP, IATA = parse_airports_js(src), parse_iata_js(src)
-            return len(AP)
+            n = len(AP)
+            _add_former_codes()
+            return n
         except Exception:
             continue
     AP, IATA = {}, {}
@@ -75,8 +90,15 @@ def load_airports(path=None):
 
 
 def resolve_airport(code):
-    """Airport code as typed in a logbook (ICAO or 3-letter IATA) → ICAO in AP, or None."""
+    """Airport code as typed in a logbook (ICAO, IATA or FAA) → current ICAO in AP, or None."""
+    r = _resolve(code)
+    return FORMER_ICAO.get(r, r) if r else None
+
+
+def _resolve(code):
     c = (code or '').strip().upper()
+    if c in FORMER_ICAO and FORMER_ICAO[c] in AP:
+        return FORMER_ICAO[c]
     if c in AP:
         return c
     if c in IATA and IATA[c] in AP:  # IATA or FAA identifier
