@@ -189,7 +189,7 @@ def compute(f):
     return r
 
 
-CSV_COLS = ['Date', 'Tail Number', 'Model', 'Landings', 'FS Night Landings', 'FS Day Landings', 'X-Country', 'Night', 'SIC', 'PIC', 'Total Flight Time', 'Route', 'Comments', 'Aircraft Registration', 'Flight Number', 'Crew Start Time (UTC)', 'Block Out Time', 'Engine Start', 'Flight Start', 'Flight End', 'Engine End', 'Block In Time', 'Takeoffs (any)', 'Takeoffs - Night']
+CSV_COLS = ['Date', 'Tail Number', 'Model', 'Landings', 'FS Night Landings', 'FS Day Landings', 'X-Country', 'Night', 'SIC', 'PIC', 'Total Flight Time', 'Route', 'Comments', 'Aircraft Registration', 'Flight Number', 'Crew Start Time (UTC)', 'Block Out Time', 'Flight Start', 'Flight End', 'Block In Time', 'Takeoffs (any)', 'Takeoffs - Night']
 
 
 def _mfb_time(ms):

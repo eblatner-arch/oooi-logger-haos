@@ -1,3 +1,6 @@
+## 1.12.0
+- The CSV logs five times: Crew Start Time (CREW), Block Out Time (OUT), Flight Start (OFF), Flight End (ON), and Block In Time (IN). Removed Engine Start and Engine End, which only repeated OUT and IN.
+
 ## 1.11.0
 - Removed the Airline code setting. Flight numbers show as `Flt 1234`.
 
