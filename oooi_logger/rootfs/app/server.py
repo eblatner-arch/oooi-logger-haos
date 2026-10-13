@@ -80,7 +80,7 @@ def options():
 
 
 def settings():
-    s = {'seat': 'PIC', 'anon_tail': '#002377', 'model': 'B737'}
+    s = {'seat': 'PIC', 'anon_tail': '#002377', 'model': 'B737', 'airline': ''}
     s.update(load('settings.json', {}))
     return s
 
@@ -379,7 +379,7 @@ def do_sync():
 
 
 # ---------------- Gemini ----------------
-SCAN_PROMPT = """The image is a photo of a Boeing 737 FMC/CDU screen showing the airline ACARS page titled "ACARS-PREVIOUS OOOI". Read the values under each label:
+SCAN_PROMPT = """The image is a photo of a Boeing FMC/CDU screen showing the airline ACARS page titled "ACARS-PREVIOUS OOOI". Read the values under each label:
 - FLT NBR: flight number (digits only)
 - DEP/DES: departure and destination ICAO codes, written like KORD/KDEN
 - CREW, OUT, OFF, ON, IN: four-digit UTC times (HHMM)
@@ -448,7 +448,7 @@ def update_airports():
         test = fm.parse_airports_js(src)
     except Exception:
         raise RuntimeError('The downloaded airport list was not in the expected format. Your current airport list is unchanged.')
-    if n < MIN_AIRPORTS or 'KEWR' not in test:
+    if n < MIN_AIRPORTS or 'KJFK' not in test:
         raise RuntimeError(f'The downloaded list only had {n} airports, which looks wrong. Your current airport list is unchanged.')
     before = len(fm.AP)
     with LOCK:
@@ -632,6 +632,8 @@ class Handler(BaseHTTPRequestHandler):
                 for k in ('seat', 'anon_tail', 'model'):
                     if k in data and str(data[k]).strip():
                         s[k] = str(data[k]).strip()
+                if 'airline' in data:
+                    s['airline'] = ''.join(ch for ch in str(data['airline'] or '').upper() if ch.isalnum())[:3]
                 save('settings.json', s)
             changed()
             return self._json(200, {'ok': True, 'settings': s})

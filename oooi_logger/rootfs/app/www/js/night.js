@@ -42,7 +42,7 @@ function renderNight() {
   if (!r.ok) return;
   const a = AP[f.from], b = AP[f.to], t = r.t;
   const smp = trackSamples(t, a, b);
-  $('nRoute').textContent = `${f.from}–${f.to}${f.flightNumber ? ' · UA' + f.flightNumber : ''}`;
+  $('nRoute').textContent = `${f.from}–${f.to}${f.flightNumber ? ' · ' + fltNo(f.flightNumber) : ''}`;
   $('nDate').textContent = new Date(f.date + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
 
   const st = $('nStats'); st.innerHTML = '';

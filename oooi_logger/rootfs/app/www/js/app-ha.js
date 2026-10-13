@@ -16,12 +16,13 @@ const $ = (id) => document.getElementById(id);
 const FIELDS = ['date', 'flightNumber', 'tail', 'from', 'to', 'crew', 'out', 'off', 'on', 'in', 'comments'];
 const S = {
   duty: 'PF', seat: 'PIC', editId: null, flights: [],
-  cfg: { seat: 'PIC', anonTail: '#002377', model: 'B737' },
+  cfg: { seat: 'PIC', anonTail: '#002377', model: 'B737', airline: '' },
   drive: {}, scan: {}, scannedTrip: null, poll: null,
 };
 const fmtHM = (min) => (min == null || isNaN(min) ? '--:--' : `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`);
 const todayLocal = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 function toast(t) { const el = $('toast'); el.textContent = t; el.hidden = false; clearTimeout(toast._t); toast._t = setTimeout(() => (el.hidden = true), 3200); }
+const fltNo = (n) => `${S.cfg.airline || ''}${n}`;
 function setSeg(segId, v) { for (const b of $(segId).querySelectorAll('button')) b.setAttribute('aria-pressed', String(b.dataset.v === v)); }
 
 function readForm() {
@@ -79,7 +80,7 @@ function update() {
   const chip = (txt, cls) => { const c = document.createElement('span'); c.className = 'chip ' + (cls || ''); c.textContent = txt; chips.appendChild(c); };
   if (S.duty === 'PF') { chip(r.nightTO ? 'Night takeoff' : 'Day takeoff', r.nightTO ? 'night' : 'day'); chip(r.nightLdg ? 'Night FS landing' : 'Day FS landing', r.nightLdg ? 'night' : 'day'); }
   else chip('PM · no takeoff or landing');
-  if (f.flightNumber) chip('UA' + f.flightNumber);
+  if (f.flightNumber) chip(fltNo(f.flightNumber));
   if (f.tail) chip(f.tail);
   out.append(calc, chips);
   return r;
@@ -218,7 +219,7 @@ function renderList() {
     const left = document.createElement('div');
     const route = document.createElement('div'); route.className = 'route'; route.textContent = `${f.from}–${f.to}`;
     const meta = document.createElement('div'); meta.className = 'meta';
-    meta.textContent = `${d.toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' })} · UA${f.flightNumber || '—'} · ${f.tail || 'no reg'}`;
+    meta.textContent = `${d.toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' })} · ${f.flightNumber ? fltNo(f.flightNumber) : '—'} · ${f.tail || 'no reg'}`;
     left.append(route, meta);
     const tm = document.createElement('div'); tm.className = 'time'; tm.textContent = r.ok ? r.total.toFixed(2) : '—';
     const chips = document.createElement('div'); chips.className = 'chips';
@@ -267,7 +268,7 @@ async function refresh() {
   S.flights = st.flights || [];
   S.drive = st.drive || {}; S.scan = st.scan || {}; S.airports = st.airports || {};
   const s = st.settings || {};
-  S.cfg = { seat: s.seat || 'PIC', anonTail: s.anon_tail || '#002377', model: s.model || 'B737' };
+  S.cfg = { seat: s.seat || 'PIC', anonTail: s.anon_tail || '#002377', model: s.model || 'B737', airline: s.airline || '' };
   statusLine();
   if (!$('view-set').hidden) renderSettings();
   if (!$('view-list').hidden) renderList();
@@ -288,7 +289,7 @@ $('syncDrive2').onclick = () => $('syncNow').onclick();
 
 // ---------- Settings ----------
 function renderSettings() {
-  setSeg('defSeatSeg', S.cfg.seat); $('anonTail').value = S.cfg.anonTail; $('model').value = S.cfg.model;
+  setSeg('defSeatSeg', S.cfg.seat); $('anonTail').value = S.cfg.anonTail; $('model').value = S.cfg.model; $('airline').value = S.cfg.airline;
   const d = S.drive, info = $('driveInfo'); info.innerHTML = '';
   const p = d.pending;
   $('devCode').hidden = !p;
@@ -317,7 +318,7 @@ function renderSettings() {
 $('saveSettings').onclick = async () => {
   const seat = $('defSeatSeg').querySelector('[aria-pressed="true"]').dataset.v;
   try {
-    await api('PUT', 'api/settings', { seat, anon_tail: $('anonTail').value.trim() || '#002377', model: $('model').value.trim() || 'B737' });
+    await api('PUT', 'api/settings', { seat, anon_tail: $('anonTail').value.trim() || '#002377', model: $('model').value.trim() || 'B737', airline: $('airline').value.trim().toUpperCase() });
     await refresh();
     if (!S.editId) { S.seat = seat; setSeg('seatSeg', seat); update(); }
     toast('Settings saved'); watchSync();

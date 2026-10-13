@@ -1,14 +1,40 @@
-# OOOI Flight Logger – Home Assistant add-on
+# OOOI Flight Logger — Home Assistant add-on
 
-Scan the ACARS OOOI page, work out night time, and keep MyFlightbook import files in `/share` and Google Drive.
+For airline pilots who log in [MyFlightbook](https://myflightbook.com): snap a photo of the **ACARS-PREVIOUS OOOI** page on the FMC/CDU, and the add-on reads the times, works out night time and day/night takeoffs and landings, and keeps MyFlightbook-ready import files on your Home Assistant and in Google Drive.
+
+[![Add repository to Home Assistant](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Feblatner-arch%2Foooi-logger-haos)
+
+## Features
+
+- Photo scan of the OOOI page with Google Gemini (optional; manual entry always works)
+- Total time CREW→IN; night time from OUT to IN using sun position along the great-circle route
+- Day/night takeoff and full-stop landing per 14 CFR 61.57(b) when you were pilot flying
+- Night tab with a route map
+- MyFlightbook import CSV of pending flights, plus a full-log CSV and JSON backup, written to `/share/oooi_logger/` and (optionally) Google Drive
+- Flights are stored in the add-on, so Home Assistant backups include them
+- Optional full-screen iPhone Home Screen app
 
 ## Install
 
-Settings → Add-ons → Add-on Store → ⋮ → **Repositories** → add:
+1. In Home Assistant: **Settings → Add-ons → Add-on Store → ⋮ (top right) → Repositories**, add
 
-```
-https://github.com/eblatner-arch/oooi-logger-haos
-```
+   ```
+   https://github.com/eblatner-arch/oooi-logger-haos
+   ```
 
-Install **OOOI Flight Logger**, fill in the Configuration tab, start it, and open **Flight Log** in the sidebar.
-Setup details are in [`oooi_logger/DOCS.md`](oooi_logger/DOCS.md).
+   (or click the button above).
+2. Install **OOOI Flight Logger**.
+3. Fill in the **Configuration** tab (all optional — see the Documentation tab for the Gemini key and Google Drive setup), start the add-on, and open **Flight Log** in the sidebar.
+4. In **Flight Log → Settings**, set your MyFlightbook tail number and model, default seat, and airline code.
+
+Full setup guide: [`oooi_logger/DOCS.md`](oooi_logger/DOCS.md).
+
+Requires Home Assistant OS or Supervised (add-ons). Runs on aarch64, amd64 and armv7.
+
+## Disclaimer
+
+Not affiliated with any airline, Boeing, MyFlightbook, or Google. The ACARS page layout varies by operator; the scanner was built for the "ACARS-PREVIOUS OOOI" page format. Always verify scanned times and computed values before importing — your logbook is your responsibility.
+
+## License
+
+MIT — see [LICENSE](LICENSE).

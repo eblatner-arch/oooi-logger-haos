@@ -1,3 +1,9 @@
+## 1.3.0
+- Ready for other pilots: no airline is hard-coded. Set an optional **Airline code** in Settings to show it in front of flight numbers (existing installs: enter your code once in Settings).
+- The Home Screen web app port (8199) is now **off by default** for new installs. Turn it on in the add-on's Network section, and set `app_password` first.
+- Clearer Settings help for the MyFlightbook tail number and model.
+- Rewritten documentation and README; MIT license added.
+
 ## 1.2.0
 - The app is now also served on its own port (**8199**) so it can be added to the iPhone Home Screen from Safari as a full-screen web app with its own icon.
 - Optional `app_password` protects that port. Leave it blank for no login.

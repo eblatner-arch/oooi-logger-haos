@@ -163,7 +163,8 @@
         <div class="field"><label for="anonTail">MFB tail number</label><input id="anonTail" class="mono" value="#002377"></div>
         <div class="field"><label for="model">Model</label><input id="model" class="mono" value="B737"></div>
       </div>
-      <p class="small" style="margin:0">Every flight imports to your anonymous 737 tail. The real registration goes in the Aircraft Registration property.</p>
+      <div class="field"><label for="airline">Airline code</label><input id="airline" class="mono" maxlength="3" autocomplete="off" placeholder="e.g. UA, DL, AAL" style="text-transform:uppercase"></div>
+      <p class="small" style="margin:0">Every flight imports to one aircraft in your MyFlightbook account, usually an anonymous one. Set the MFB tail number and model to match that aircraft exactly. The real registration goes in the Aircraft Registration property. The airline code is only shown in front of flight numbers in this app.</p>
       <button class="btn primary" id="saveSettings" type="button">Save settings</button>
     </div>
     <div class="card">
