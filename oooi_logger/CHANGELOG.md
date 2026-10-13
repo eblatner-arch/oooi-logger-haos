@@ -1,3 +1,6 @@
+## 2.1.2
+- The "airport code isn't in the airport list" note under Settings → Logbook history is now checked against the current airport list each time, so it no longer lists KPBI (now counted as KDJT) or codes fixed by Update airport database. No need to re-import.
+
 ## 2.1.1
 - Map wraps east–west: drag past the date line and the world continues, and routes across the Pacific draw as one unbroken arc.
 - Fit centres on the shortest span that holds all your airports, so a logbook with Asia and Europe frames the right way round.

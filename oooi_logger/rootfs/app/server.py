@@ -498,11 +498,22 @@ def state():
 
 
 # ---------------- Imported MyFlightbook history ----------------
+_UNKNOWN_CACHE = {'key': None, 'val': None}
+
+
 def history_info():
     h = load('history.json', None)
     if not h:
         return None
-    return {'imported_at': h.get('imported_at'), 'version': h.get('imported_at'), 'file': h.get('file', ''), **h.get('summary', {})}
+    info = {'imported_at': h.get('imported_at'), 'version': h.get('imported_at'), 'file': h.get('file', ''), **h.get('summary', {})}
+    # Recheck unknown airports against the current airport list (it may have been updated, or a
+    # renamed code like KPBI→KDJT handled) instead of showing the list saved at import time.
+    key = (h.get('imported_at'), len(fm.AP), load('airports_meta.json', {}).get('updated'))
+    if _UNKNOWN_CACHE['key'] != key:
+        _, unknown, n = hist.resolve(h.get('entries') or [])
+        _UNKNOWN_CACHE.update(key=key, val=(unknown, n))
+    info['unknown_airports'], info['unknown_airport_count'] = _UNKNOWN_CACHE['val']
+    return info
 
 
 def changed():
