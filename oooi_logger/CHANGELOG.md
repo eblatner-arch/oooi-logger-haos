@@ -1,3 +1,6 @@
+## 2.0.2
+- Palm Beach International's old code KPBI (and PBI) now counts as its new code KDJT, so older flights show on the map and in Stats as one airport. Your logged and imported flights keep the code as written.
+
 ## 2.0.1
 - Fixed: a Drive file you deleted (moved to Drive's trash) kept being updated in the trash instead of being recreated. The add-on now makes a fresh copy in the folder on the next sync.
 
