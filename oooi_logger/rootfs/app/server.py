@@ -84,6 +84,7 @@ def settings():
     s = {'seat': 'PIC', 'anon_tail': '#002377', 'model': 'B737'}
     s.update(load('settings.json', {}))
     s.pop('airline', None)  # setting removed in 1.11.0
+    s['csv_names'] = {}     # standard headers are fixed to MyFlightbook's names since 1.13.0
     return s
 
 
@@ -662,8 +663,7 @@ class Handler(BaseHTTPRequestHandler):
                             cid = 'c' + secrets.token_hex(4)
                         extra.append({'id': cid, 'name': name, 'source': src,
                                       'text': str(x.get('text') or '')[:200] if src in ('text', 'field') else ''})
-                    names = {c: str(names[c]).strip()[:80] for c in fm.CSV_COLS
-                             if c in names and str(names[c]).strip() and str(names[c]).strip() != c}
+                    names = {}  # standard headers can no longer be renamed
                     off = [c for c in fm.CSV_COLS if c in off]
                     if len(off) == len(fm.CSV_COLS) and not extra:
                         return self._json(400, {'error': 'Keep at least one column.'})

@@ -180,3 +180,5 @@ details.card:not([open]) { gap: 0; }
 .x-show[hidden] { display: none; }
 .x-show input { width: 20px; height: 20px; margin: 0; accent-color: var(--accent); }
 #customFields input.edited { border-color: var(--accent); }
+.colrow .colname { font: 500 15px var(--f-body); color: var(--ink); padding: 8px 0; min-width: 0; overflow-wrap: anywhere; }
+.colrow.off .colname { opacity: .45; text-decoration: line-through; }

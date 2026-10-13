@@ -1,3 +1,6 @@
+## 1.13.0
+- Made for MyFlightbook: standard CSV column names are now fixed to MyFlightbook's names, so an import can't break from a renamed header. Any renamed headers go back to MyFlightbook's names. Your own added columns can still be named anything.
+
 ## 1.12.1
 - Fixed the Use / Header / Edit headings in Settings → CSV columns being clipped.
 

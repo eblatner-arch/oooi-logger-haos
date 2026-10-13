@@ -401,8 +401,7 @@ function renderColumns(force) {
     const row = document.createElement('div'); row.className = 'colrow';
     const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = !off.has(c); cb.dataset.col = c;
     cb.setAttribute('aria-label', `Include ${c}`);
-    const inp = document.createElement('input'); inp.type = 'text'; inp.value = names[c] || ''; inp.placeholder = c; inp.dataset.col = c;
-    inp.setAttribute('aria-label', `Header for ${c}`); inp.autocomplete = 'off'; inp.spellcheck = false;
+    const inp = document.createElement('span'); inp.className = 'colname'; inp.textContent = c;
     let vis;
     if (ON_LOG_SCREEN.has(c)) { vis = document.createElement('span'); vis.className = 'onscreen'; vis.textContent = '✓'; vis.title = 'Already on the Log screen'; }
     else { vis = document.createElement('input'); vis.type = 'checkbox'; vis.className = 'showcb'; vis.checked = show.has(c); vis.dataset.show = c; vis.setAttribute('aria-label', `Edit ${c} on the Log screen`); }
@@ -455,13 +454,11 @@ function syncMoveButtons() {
   rows.forEach((r, i) => { r.querySelector('.x-up').disabled = i === 0; r.querySelector('.x-down').disabled = i === rows.length - 1; });
 }
 function readColumns() {
-  const csvNames = {}, csvOff = [];
-  const csvShow = [];
+  const csvNames = {}, csvOff = [], csvShow = [];   // standard headers are fixed to MyFlightbook's names
   for (const el of $('csvCols').querySelectorAll('.colrow input')) {
     const c = el.dataset.col;
     if (el.dataset.show) { if (el.checked) csvShow.push(el.dataset.show); continue; }
-    if (el.type === 'checkbox') { if (!el.checked) csvOff.push(c); }
-    else if (el.value.trim() && el.value.trim() !== c) csvNames[c] = el.value.trim();
+    if (!el.checked) csvOff.push(c);
   }
   const csvExtra = [...$('csvExtra').querySelectorAll('.extrarow')].map((r) => ({
     id: r.dataset.cid || '', name: r.querySelector('.x-name').value.trim(), source: r.querySelector('.x-src').value, text: r.querySelector('.x-text').value,
