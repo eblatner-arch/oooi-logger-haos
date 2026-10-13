@@ -268,7 +268,8 @@ async function refresh() {
   S.flights = st.flights || [];
   S.drive = st.drive || {}; S.scan = st.scan || {}; S.airports = st.airports || {};
   const s = st.settings || {};
-  S.cfg = { seat: s.seat || 'PIC', anonTail: s.anon_tail || '#002377', model: s.model || 'B737', airline: s.airline || '' };
+  S.cfg = { seat: s.seat || 'PIC', anonTail: s.anon_tail || '#002377', model: s.model || 'B737', airline: s.airline || '', csvNames: s.csv_names || {}, csvOff: s.csv_off || [] };
+  S.csvCols = st.csv_columns || CSV_COLS;
   statusLine();
   if (!$('view-set').hidden) renderSettings();
   if (!$('view-list').hidden) renderList();
@@ -289,6 +290,7 @@ $('syncDrive2').onclick = () => $('syncNow').onclick();
 
 // ---------- Settings ----------
 function renderSettings() {
+  renderColumns();
   setSeg('defSeatSeg', S.cfg.seat); $('anonTail').value = S.cfg.anonTail; $('model').value = S.cfg.model; $('airline').value = S.cfg.airline;
   const d = S.drive, info = $('driveInfo'); info.innerHTML = '';
   const p = d.pending;
@@ -324,6 +326,48 @@ $('saveSettings').onclick = async () => {
     toast('Settings saved'); watchSync();
   } catch (e) { toast(e.message); }
 };
+// ---------- CSV columns ----------
+function renderColumns(force) {
+  const cfg = S.cfg, box = $('csvCols');
+  if (!force && (S.colsDirty || box.contains(document.activeElement))) return; // don't wipe unsaved edits
+  S.colsDirty = false;
+  box.innerHTML = '';
+  const off = new Set(cfg.csvOff || []), names = cfg.csvNames || {};
+  for (const c of S.csvCols || CSV_COLS) {
+    const row = document.createElement('div'); row.className = 'colrow';
+    const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = !off.has(c); cb.dataset.col = c;
+    cb.setAttribute('aria-label', `Include ${c}`);
+    const inp = document.createElement('input'); inp.type = 'text'; inp.value = names[c] || ''; inp.placeholder = c; inp.dataset.col = c;
+    inp.setAttribute('aria-label', `Header for ${c}`); inp.autocomplete = 'off'; inp.spellcheck = false;
+    const sync = () => row.classList.toggle('off', !cb.checked); cb.onchange = sync; sync();
+    row.append(cb, inp); box.appendChild(row);
+  }
+}
+function readColumns() {
+  const csvNames = {}, csvOff = [];
+  for (const el of $('csvCols').querySelectorAll('input')) {
+    const c = el.dataset.col;
+    if (el.type === 'checkbox') { if (!el.checked) csvOff.push(c); }
+    else if (el.value.trim() && el.value.trim() !== c) csvNames[c] = el.value.trim();
+  }
+  return { csvNames, csvOff };
+}
+async function saveColumns(c) {
+  try {
+    await api('PUT', 'api/settings', { csv_names: c.csvNames, csv_off: c.csvOff });
+    document.activeElement && document.activeElement.blur && document.activeElement.blur();
+    S.colsDirty = false; await refresh(); renderColumns(true); toast('CSV columns saved'); watchSync();
+  } catch (e) { toast(e.message); }
+}
+$('saveCols').onclick = () => saveColumns(readColumns());
+$('csvCols').addEventListener('input', () => { S.colsDirty = true; });
+$('resetCols').onclick = () => {
+  const b = $('resetCols');
+  if (!b.dataset.armed) { b.dataset.armed = '1'; b.textContent = 'Tap again to reset'; setTimeout(() => { delete b.dataset.armed; b.textContent = 'Reset to defaults'; }, 3000); return; }
+  delete b.dataset.armed; b.textContent = 'Reset to defaults';
+  saveColumns({ csvNames: {}, csvOff: [] });
+};
+
 $('connectGoogle').onclick = async () => {
   try {
     await api('POST', 'api/drive/connect');

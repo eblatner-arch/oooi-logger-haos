@@ -229,13 +229,26 @@ def csv_row(f, cfg):
     }
 
 
+def csv_layout(cfg):
+    """Columns to write and their header text, from the user's column settings.
+
+    csv_off lists columns to leave out; csv_names maps a column to the header
+    text to use instead. With neither set this is exactly CSV_COLS.
+    """
+    off = set(cfg.get('csv_off') or [])
+    names = cfg.get('csv_names') or {}
+    cols = [c for c in CSV_COLS if c not in off]
+    return cols, [(names.get(c) or '').strip() or c for c in cols]
+
+
 def build_csv(flights, cfg):
     rows = sorted(flights, key=lambda f: f.get('date', '') + (f.get('out') or ''))
+    cols, headers = csv_layout(cfg)
     buf = io.StringIO()
-    w = csv.DictWriter(buf, fieldnames=CSV_COLS, lineterminator='\n', extrasaction='ignore')
-    w.writeheader()
+    w = csv.writer(buf, lineterminator='\n')
+    w.writerow(headers)
     for f in rows:
         row = csv_row(f, cfg)
         if row:
-            w.writerow(row)
+            w.writerow([row.get(c, '') for c in cols])
     return buf.getvalue()

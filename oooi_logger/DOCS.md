@@ -36,6 +36,16 @@ Open **Flight Log → Settings** and set:
 - **MFB tail number** and **Model**: the MyFlightbook aircraft every flight imports to. See below.
 - **Airline code** (optional): shown in front of flight numbers in the app, for example `UA` → `UA1234`.
 
+## Changing the CSV columns (optional)
+
+The CSVs use MyFlightbook's own column names by default, which is what its import expects. To change them, open **Flight Log → Settings → CSV columns**:
+
+- **Untick** a column to leave it out of the CSV.
+- **Type a new name** to rename its header, for example to match a custom flight property in your MyFlightbook account. Leave it blank to keep the default.
+- Tap **Save columns**. **Reset to defaults** (tap twice) puts everything back.
+
+Changes apply to every CSV the add-on writes, in `/share/oooi_logger/` and Drive. Two columns can't share the same name, and at least one must stay on.
+
 ## Finding your MyFlightbook tail number
 
 Airline pilots fly many tails of the same type, so the add-on logs every flight against one **anonymous aircraft** in MyFlightbook and puts the real registration in the Aircraft Registration property.

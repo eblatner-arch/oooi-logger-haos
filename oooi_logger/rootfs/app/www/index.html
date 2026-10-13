@@ -167,6 +167,15 @@
       <p class="small" style="margin:0">Every flight imports to one anonymous aircraft in MyFlightbook. To find its tail number: in MyFlightbook, add your type as an <b>Anonymous</b> aircraft, open it under <b>My Aircraft</b>, and copy the code under <b>Tail Number</b> (it starts with <code>#</code>). The real registration goes in the Aircraft Registration property. The airline code is only shown in front of flight numbers in this app.</p>
       <button class="btn primary" id="saveSettings" type="button">Save settings</button>
     </div>
+    <details class="card" id="csvCard">
+      <summary class="label">CSV columns</summary>
+      <p class="small" style="margin:0">The defaults are the column names MyFlightbook's import expects, so most people never change these. Untick a column to leave it out, or type a new header to rename it, for example to match a custom property in your MyFlightbook account. Blank means the default name. Changes apply to every CSV, including the ones already in /share and Drive.</p>
+      <div id="csvCols" class="cols"></div>
+      <div class="row">
+        <button class="btn primary" id="saveCols" type="button">Save columns</button>
+        <button class="btn" id="resetCols" type="button">Reset to defaults</button>
+      </div>
+    </details>
     <div class="card">
       <span class="label">How it calculates</span>
       <p class="small" style="margin:0">Total time runs from CREW to IN, the same as the TRIP time on the ACARS page. Night time counts every minute from OUT to IN when the sun is more than 6° below the horizon (civil twilight) at the aircraft's position along the great-circle route. A takeoff or landing is night when it falls between one hour after sunset and one hour before sunrise at that airport (14 CFR 61.57(b)). Times are UTC; the date is the local date at departure.</p>

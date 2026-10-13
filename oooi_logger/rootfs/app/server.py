@@ -478,6 +478,7 @@ def state():
         },
         'scan': {'configured': bool(o['gemini_api_key']), 'model': o['gemini_model']},
         'share_path': SHARE,
+        'csv_columns': fm.CSV_COLS,
         'airports': airports_info(),
     }
 
@@ -632,6 +633,21 @@ class Handler(BaseHTTPRequestHandler):
                 for k in ('seat', 'anon_tail', 'model'):
                     if k in data and str(data[k]).strip():
                         s[k] = str(data[k]).strip()
+                if 'csv_names' in data or 'csv_off' in data:
+                    names = data.get('csv_names', s.get('csv_names')) or {}
+                    off = data.get('csv_off', s.get('csv_off')) or []
+                    if not isinstance(names, dict) or not isinstance(off, list):
+                        return self._json(400, {'error': 'Bad column settings.'})
+                    names = {c: str(names[c]).strip()[:80] for c in fm.CSV_COLS
+                             if c in names and str(names[c]).strip() and str(names[c]).strip() != c}
+                    off = [c for c in fm.CSV_COLS if c in off]
+                    if len(off) == len(fm.CSV_COLS):
+                        return self._json(400, {'error': 'Keep at least one column.'})
+                    headers = fm.csv_layout({'csv_names': names, 'csv_off': off})[1]
+                    dup = sorted({h for h in headers if [x.lower() for x in headers].count(h.lower()) > 1})
+                    if dup:
+                        return self._json(400, {'error': 'Two columns are both named ' + ', '.join(f'"{d}"' for d in dup) + '.'})
+                    s['csv_names'], s['csv_off'] = names, off
                 if 'airline' in data:
                     s['airline'] = ''.join(ch for ch in str(data['airline'] or '').upper() if ch.isalnum())[:3]
                 save('settings.json', s)

@@ -159,10 +159,17 @@ function csvRow(f, cfg) {
     'Flight Start': mfbTime(t.off), 'Flight End': mfbTime(t.on), 'Engine End': mfbTime(t.in), 'Block In Time': mfbTime(t.in),
     'Takeoffs (any)': num(r.takeoffs), 'Takeoffs - Night': num(r.nightTakeoffs),
   };
-  return CSV_COLS.map((c) => { const v = row[c] ?? ''; return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }).join(',');
+  return csvLayout(cfg).cols.map((c) => csvCell(row[c] ?? '')).join(',');
+}
+const csvCell = (v) => (/[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v);
+// Columns to write and their header text (cfg.csvOff / cfg.csvNames); defaults to CSV_COLS as-is.
+function csvLayout(cfg) {
+  const off = new Set(cfg.csvOff || []), names = cfg.csvNames || {};
+  const cols = CSV_COLS.filter((c) => !off.has(c));
+  return { cols, headers: cols.map((c) => (names[c] || '').trim() || c) };
 }
 
 function buildCsv(flights, cfg) {
   const rows = flights.slice().sort((a, b) => (a.date + (a.out || '')).localeCompare(b.date + (b.out || ''))).map((f) => csvRow(f, cfg)).filter(Boolean);
-  return CSV_COLS.join(',') + '\n' + rows.join('\n') + (rows.length ? '\n' : '');
+  return csvLayout(cfg).headers.map(csvCell).join(',') + '\n' + rows.join('\n') + (rows.length ? '\n' : '');
 }
