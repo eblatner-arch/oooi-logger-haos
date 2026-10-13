@@ -9,7 +9,11 @@ For airline pilots who log in [MyFlightbook](https://myflightbook.com): snap a p
 - Photo scan of the OOOI page with Google Gemini (optional; manual entry always works)
 - Total time CREW→IN; night time from OUT to IN using sun position along the great-circle route
 - Day/night takeoff and full-stop landing per 14 CFR 61.57(b) when you were pilot flying
-- Night tab with a route map
+- Night breakdown with a route map for each flight
+- **Stats**: totals by period, hours by month and year, top routes, airports and aircraft, records
+- **Currency**: 90-day day and night takeoff/landing currency (14 CFR 61.57) at a glance
+- **Map**: every airport and route you've flown, with pan, zoom and period filter
+- **Import your MyFlightbook history** so Stats and Map cover your whole career, not just flights logged here
 - MyFlightbook import CSV of pending flights, plus a full-log CSV and JSON backup, written to `/share/oooi_logger/` and (optionally) Google Drive
 - Choose which MyFlightbook columns to export, edit any automatic value per flight, and add your own columns
 - Flights are stored in the add-on, so Home Assistant backups include them

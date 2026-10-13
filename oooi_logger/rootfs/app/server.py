@@ -22,6 +22,7 @@ from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import flightmath as fm
+import history as hist
 
 DATA = os.environ.get('OOOI_DATA', '/data')
 SHARE = os.environ.get('OOOI_SHARE', '/share/oooi_logger')
@@ -481,10 +482,19 @@ def state():
         },
         'scan': {'configured': bool(o['gemini_api_key']), 'model': o['gemini_model']},
         'share_path': SHARE,
+        'history': history_info(),
         'csv_columns': fm.CSV_COLS,
         'csv_sources': fm.CSV_SOURCES,
         'airports': airports_info(),
     }
+
+
+# ---------------- Imported MyFlightbook history ----------------
+def history_info():
+    h = load('history.json', None)
+    if not h:
+        return None
+    return {'imported_at': h.get('imported_at'), 'version': h.get('imported_at'), 'file': h.get('file', ''), **h.get('summary', {})}
 
 
 def changed():
@@ -576,6 +586,11 @@ class Handler(BaseHTTPRequestHandler):
         p = self._route()
         if p == '/api/state':
             return self._json(200, state())
+        if p == '/api/history':
+            h = load('history.json', None) or {'entries': []}
+            entries, unknown, n = hist.resolve(h.get('entries') or [])
+            return self._json(200, {**h, 'entries': entries, 'unknown_airports': unknown, 'unknown_airport_count': n,
+                                    'version': f"{h.get('imported_at')}|{len(fm.AP)}"})
         if p == '/api/csv/pending':
             with LOCK:
                 csv_text = fm.build_csv([f for f in flights() if not f.get('imported')], settings())
@@ -748,6 +763,30 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(502, {'error': str(e)})
             changed()
             return self._json(200, {'ok': True, **res, 'airports': airports_info()})
+        if p == '/api/history/import':
+            try:
+                body = self._body()
+            except ValueError:
+                return self._json(413, {'error': 'That file is over 25 MB.'})
+            try:
+                entries, summary = hist.parse(body)
+            except ValueError as e:
+                return self._json(400, {'error': str(e)})
+            except Exception:
+                log.exception('history import failed')
+                return self._json(400, {'error': "Couldn't read that file. Use the CSV download from MyFlightbook."})
+            name = urllib.parse.unquote(self.headers.get('X-File-Name') or '')[:120]
+            with LOCK:
+                save('history.json', {'imported_at': now_iso(), 'file': name, 'summary': summary, 'entries': entries})
+            log.info('Imported MyFlightbook history: %d flights (%s to %s)', summary['flights'], summary['first'], summary['last'])
+            return self._json(200, {'ok': True, 'history': history_info()})
+        if p == '/api/history/delete':
+            with LOCK:
+                try:
+                    os.remove(_path('history.json'))
+                except FileNotFoundError:
+                    pass
+            return self._json(200, {'ok': True})
         if p == '/api/drive/cancel':
             DEVICE['pending'] = None
             return self._json(200, {'ok': True})

@@ -1,3 +1,11 @@
+## 2.0.0
+- **Stats tab**: totals for any period (all time, last 12 months, last 90 days, or a year), hours by year or month with a table view, top routes, airports and aircraft types, and records.
+- **Currency**: day and night 90-day takeoff and landing currency (14 CFR 61.57) with the date you're current through.
+- **Map tab**: every airport and route you've flown, sized by how often, with pan, zoom, and tap-for-details.
+- **Import your MyFlightbook history** (Settings → Logbook history) so Stats and Map cover your whole logbook. Imported history never goes into your import CSVs.
+- **Update airport database** now keeps small airports too, and recognizes 3-letter IATA and FAA codes.
+- The tab bar is now Log, Flights, Stats, Map, Settings. The night breakdown opens from **Show night work →** on the Log screen.
+
 ## 1.13.0
 - Made for MyFlightbook: standard CSV column names are now fixed to MyFlightbook's names, so an import can't break from a renamed header. Any renamed headers go back to MyFlightbook's names. Your own added columns can still be named anything.
 

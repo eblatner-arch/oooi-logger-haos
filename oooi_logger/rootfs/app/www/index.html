@@ -26,7 +26,8 @@
   <nav class="tabs" role="tablist">
     <button role="tab" id="tab-log" aria-selected="true">Log</button>
     <button role="tab" id="tab-list" aria-selected="false">Flights</button>
-    <button role="tab" id="tab-night" aria-selected="false">Night</button>
+    <button role="tab" id="tab-stats" aria-selected="false">Stats</button>
+    <button role="tab" id="tab-map" aria-selected="false">Map</button>
     <button role="tab" id="tab-set" aria-selected="false">Settings</button>
   </nav>
 
@@ -118,8 +119,66 @@
     <div class="list" id="list"></div>
   </section>
 
-  <!-- NIGHT -->
+  <!-- STATS -->
+  <section id="view-stats" hidden style="display:grid;gap:12px">
+    <div class="card" id="statsEmpty">
+      <div class="empty"><b>No flights yet</b><span>Log a flight, or import your MyFlightbook logbook to see your totals, currency and records.</span></div>
+      <button class="btn primary" id="statsGoImport" type="button">Import MyFlightbook logbook</button>
+    </div>
+    <div id="statsBody" hidden style="display:grid;gap:12px">
+      <div class="card">
+        <span class="label">Currency</span>
+        <div id="curBox" style="display:grid;gap:10px"></div>
+      </div>
+      <div class="card">
+        <div class="row" style="justify-content:space-between">
+          <label for="statPeriod">Period</label>
+          <select id="statPeriod" class="period"></select>
+        </div>
+        <p class="small" style="margin:0" id="statSource"></p>
+        <div class="calc" id="statTiles"></div>
+        <p class="small" style="margin:0" id="statSims" hidden></p>
+        <div class="hint" id="statsImportHint" hidden><span class="small">Only flights logged here are counted.</span><button class="linkbtn" id="statsGoImport2" type="button">Import MyFlightbook history →</button></div>
+      </div>
+      <div class="card">
+        <span class="label" id="barTitle">Hours by month</span>
+        <div class="chartbox" id="barChart"></div>
+        <p class="small tip" id="barTip" hidden></p>
+        <details class="tableview"><summary class="linkbtn">Show as a table</summary><div class="tablewrap"><table id="barTable"></table></div></details>
+      </div>
+      <div class="card"><span class="label">Top routes</span><div id="topRoutes" class="toplist"></div></div>
+      <div class="card"><span class="label">Top airports</span><div id="topAirports" class="toplist"></div></div>
+      <div class="card"><span class="label">Aircraft types · hours</span><div id="topTypes" class="toplist"></div></div>
+      <div class="card"><span class="label">Records</span><dl id="records" class="records"></dl></div>
+    </div>
+  </section>
+
+  <!-- MAP -->
+  <section id="view-map" hidden style="display:grid;gap:12px">
+    <div class="card" id="mapEmpty">
+      <div class="empty"><b>Nothing on the map yet</b><span>Log a flight, or import your MyFlightbook logbook to see every airport and route you've flown.</span></div>
+      <button class="btn primary" id="mapGoImport" type="button">Import MyFlightbook logbook</button>
+    </div>
+    <div id="mapBody" hidden style="display:grid;gap:12px">
+      <div class="card">
+        <div class="row" style="justify-content:space-between">
+          <label for="mapPeriod">Period</label>
+          <select id="mapPeriod" class="period"></select>
+        </div>
+        <p class="small" style="margin:0" id="mapSummary"></p>
+        <div class="mapwrap">
+          <div class="mapbox"><svg id="wMap" class="worldmap" role="img" aria-label="Map of airports and routes flown"></svg></div>
+          <div class="mapctl"><button class="btn" id="mapIn" type="button" aria-label="Zoom in">+</button><button class="btn" id="mapOut" type="button" aria-label="Zoom out">−</button><button class="btn" id="mapFit" type="button">Fit</button></div>
+        </div>
+        <p class="small" style="margin:0" id="mapInfo" aria-live="polite"></p>
+        <div class="hint" id="mapImportHint" hidden><span class="small">Only flights logged here are shown.</span><button class="linkbtn" id="mapGoImport2" type="button">Import MyFlightbook history →</button></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- NIGHT (opened from the Log screen) -->
   <section id="view-night" hidden style="display:grid;gap:12px">
+    <button class="linkbtn" id="nightBack" type="button" style="justify-self:start">← Back to Log</button>
     <div class="card" id="nightEmpty">
       <div class="empty"><b>No flight to show</b><span>Enter or scan a flight on the Log tab, or tap a saved flight in Flights. This tab shows how its night time, takeoff and landing were worked out.</span></div>
     </div>
@@ -210,6 +269,17 @@
       </div>
     </div>
     <div class="card">
+      <span class="label">Logbook history</span>
+      <p class="small" style="margin:0" id="histInfo"></p>
+      <p class="small" style="margin:0">In MyFlightbook, open <b>Logbook → Download</b> and choose <b>CSV</b>, then import that file here. It's used only for Stats and Map; it is never added to your import CSVs. Importing again replaces it.</p>
+      <p class="small warnline" id="histUnknown" hidden></p>
+      <input type="file" id="histFile" accept=".csv,text/csv" hidden>
+      <div class="row">
+        <button class="btn primary" id="histPick" type="button">Import MyFlightbook logbook</button>
+        <button class="btn" id="histRemove" type="button" hidden>Remove imported history</button>
+      </div>
+    </div>
+    <div class="card">
       <span class="label">Airport database</span>
       <p class="small" style="margin:0" id="airportInfo"></p>
       <button class="btn" id="updateAirports" type="button">Update airport database</button>
@@ -236,6 +306,7 @@
 <script src="js/land.js"></script>
 <script src="js/core.js"></script>
 <script src="js/night.js"></script>
+<script src="js/logbook.js"></script>
 <script src="js/app-ha.js"></script>
 </body>
 </html>

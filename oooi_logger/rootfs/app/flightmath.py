@@ -26,9 +26,20 @@ def parse_airports_js(src):
     return out
 
 
+def parse_iata_js(src):
+    """IATA → ICAO map from airports.js (only present in lists downloaded since 2.0.0)."""
+    m = re.search(r'const AP_IATA="(.*?)";', src, re.S)
+    return dict(p.split(':', 1) for p in m.group(1).split(';') if ':' in p) if m and m.group(1) else {}
+
+
 def build_airports_js(csv_text):
-    """Turn the airportsdata CSV into the compact airports.js format (airline airports only)."""
-    rows = [r for r in csv.DictReader(io.StringIO(csv_text)) if r.get('iata') and len(r.get('icao') or '') == 4 and r.get('lat') and r.get('lon')]
+    """Turn the airportsdata CSV into the compact airports.js format.
+
+    Keeps every airport with a 4-letter ICAO code (so logbook history from small
+    fields shows on the map) and an alias list of IATA and FAA identifiers.
+    """
+    rows = [r for r in csv.DictReader(io.StringIO(csv_text))
+            if re.fullmatch(r'[A-Z0-9]{4}', (r.get('icao') or '').upper()) and r.get('lat') and r.get('lon')]
     tzs = sorted({r['tz'] for r in rows if r.get('tz')})
     ti = {t: i for i, t in enumerate(tzs)}
 
@@ -36,25 +47,49 @@ def build_airports_js(csv_text):
         s = f'{float(v):.3f}'.rstrip('0').rstrip('.')
         return '0' if s in ('-0', '') else s
 
-    parts = [f"{r['icao']}{num(r['lat'])},{num(r['lon'])},{ti.get(r.get('tz') or '', 0)}" for r in rows if r.get('tz') in ti]
-    return 'const AP_TZ=' + json.dumps(tzs) + ';\nconst AP_RAW="' + ';'.join(parts) + '";\n', len(parts)
+    kept = [r for r in rows if r.get('tz') in ti]
+    parts = [f"{r['icao']}{num(r['lat'])},{num(r['lon'])},{ti.get(r.get('tz') or '', 0)}" for r in kept]
+    alias = {}
+    for r in kept:
+        for code in ((r.get('iata') or '').upper(), (r.get('lid') or '').upper()):
+            if re.fullmatch(r'[A-Z0-9]{3,4}', code) and code != r['icao'].upper():
+                alias.setdefault(code, r['icao'].upper())
+    iata = [f'{k}:{v}' for k, v in sorted(alias.items())]
+    return ('const AP_TZ=' + json.dumps(tzs) + ';\nconst AP_RAW="' + ';'.join(parts) + '";\n'
+            + 'const AP_IATA="' + ';'.join(iata) + '";\n'), len(parts)
 
 
 def load_airports(path=None):
     """Load airports from path (falls back to the bundled copy). Returns the count."""
-    global AP
+    global AP, IATA
     for candidate in ([path] if path else []) + [BUNDLED_AIRPORTS]:
         try:
             with open(candidate, encoding='utf-8') as fh:
-                AP = parse_airports_js(fh.read())
+                src = fh.read()
+            AP, IATA = parse_airports_js(src), parse_iata_js(src)
             return len(AP)
         except Exception:
             continue
-    AP = {}
+    AP, IATA = {}, {}
     return 0
 
 
-AP = {}
+def resolve_airport(code):
+    """Airport code as typed in a logbook (ICAO or 3-letter IATA) → ICAO in AP, or None."""
+    c = (code or '').strip().upper()
+    if c in AP:
+        return c
+    if c in IATA and IATA[c] in AP:  # IATA or FAA identifier
+        return IATA[c]
+    if len(c) == 3:
+        # Before the airport list has IATA codes: US (K), Canada (C + Y..), Alaska/Hawaii/Pacific (P)
+        for guess in ('K' + c, 'C' + c if c[0] == 'Y' else None, 'P' + c):
+            if guess and guess in AP:
+                return guess
+    return None
+
+
+AP, IATA = {}, {}
 load_airports()
 
 

@@ -13,7 +13,25 @@ Log airline flights from the ACARS-PREVIOUS OOOI page and import them into MyFli
   - `Flight Log – all flights.csv`: everything
   - `flights.json`: full backup
 - Flights live in the add-on's data folder, so Home Assistant backups include them.
-- **Settings → Update airport database** downloads the latest airport list to Home Assistant (kept in the add-on's data folder; the copy built into the add-on is the fallback).
+- **Settings → Update airport database** downloads the latest airport list to Home Assistant (kept in the add-on's data folder; the copy built into the add-on is the fallback). The downloaded list includes small airports and recognizes 3-letter IATA and FAA codes, so run it once if your history has GA flying.
+
+## Stats, Map and currency
+
+The **Stats** and **Map** tabs cover flights logged here plus any history you import from MyFlightbook (below). Choose a period at the top: all time, the last 12 months, the last 90 days, or a single year.
+
+- **Stats** shows your totals (total, PIC, SIC, night, cross-country, flights, landings, airports, distance), a chart of hours by year or month (tap a bar for details, or open it as a table), your top routes, airports and aircraft, and records such as your longest flight.
+- **Currency** at the top of Stats checks 14 CFR 61.57: three takeoffs and three landings in the last 90 days (day), and three night takeoffs and three night full-stop landings (night). It shows the date you're current through and turns amber two weeks before. It counts every logged takeoff and landing, including simulator sessions, in any aircraft. Your operator's recency rules (for example 14 CFR 121.439) and type requirements may differ, so use it as a reminder, not a legal determination.
+- **Map** draws every airport you've visited (bigger dots for more visits) and every route (thicker lines for more flights). Drag to move, pinch or use **+ −** to zoom, **Fit** to reset, and tap an airport for its visits and dates.
+- The **Night** breakdown for a flight is under **Show night work →** on the Log screen.
+
+## Importing your MyFlightbook history (optional)
+
+1. On the MyFlightbook website, open **Logbook → Download** and choose **CSV**.
+2. In **Flight Log → Settings → Logbook history**, tap **Import MyFlightbook logbook** and pick that file.
+
+The add-on reads only the columns it needs (date, route, times, landings, takeoffs, aircraft), so it doesn't matter how many other columns your logbook has. Imported history is used only for Stats and Map. It is never added to the CSVs you import into MyFlightbook, so nothing gets imported twice. A flight that's both in the history and logged here (same date and route) is counted once.
+
+Importing again replaces the old history, so download a fresh export whenever you want the totals brought up to date. **Remove imported history** deletes it. Airports the airport list doesn't know are listed in Settings and left off the map; **Update airport database** fixes most of them, with no need to re-import.
 
 ## Configuration
 

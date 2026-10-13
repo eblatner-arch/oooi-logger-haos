@@ -149,15 +149,19 @@ function update() {
 
 // ---------- Tabs ----------
 function show(view) {
-  for (const v of ['log', 'list', 'night', 'set']) { $('view-' + v).hidden = v !== view; $('tab-' + v).setAttribute('aria-selected', String(v === view)); }
+  for (const v of ['log', 'list', 'stats', 'map', 'night', 'set']) $('view-' + v).hidden = v !== view;
+  for (const v of ['log', 'list', 'stats', 'map', 'set']) $('tab-' + v).setAttribute('aria-selected', String(v === view || (view === 'night' && v === 'log')));
   $('savebar').hidden = view !== 'log';
   if (view === 'log') update();
   if (view === 'list') renderList();
   if (view === 'night') renderNight();
+  if (view === 'stats') renderStats();
+  if (view === 'map') renderMap();
   if (view === 'set') renderSettings();
   window.scrollTo(0, 0);
 }
-for (const v of ['log', 'list', 'night', 'set']) $('tab-' + v).onclick = () => show(v);
+for (const v of ['log', 'list', 'stats', 'map', 'set']) $('tab-' + v).onclick = () => show(v);
+$('nightBack').onclick = () => show('log');
 $('showWork').onclick = () => show('night');
 for (const k of FIELDS) $(k).addEventListener('input', update);
 $('date').addEventListener('change', update);
@@ -329,6 +333,7 @@ async function refresh() {
   const st = await api('GET', 'api/state');
   S.flights = st.flights || [];
   S.drive = st.drive || {}; S.scan = st.scan || {}; S.airports = st.airports || {};
+  S.historyInfo = st.history || null;
   const s = st.settings || {};
   S.cfg = { seat: s.seat || 'PIC', anonTail: s.anon_tail || '#002377', model: s.model || 'B737', csvNames: s.csv_names || {}, csvOff: s.csv_off || [], csvExtra: s.csv_extra || [], csvShow: s.csv_show || [] };
   S.csvCols = st.csv_columns || CSV_COLS;
@@ -354,7 +359,8 @@ $('syncDrive2').onclick = () => $('syncNow').onclick();
 
 // ---------- Settings ----------
 function renderSettings() {
-  renderColumns();
+  renderColumns(); renderHistoryCard();
+  $('histPick').textContent = S.historyInfo ? 'Replace with a new export' : 'Import MyFlightbook logbook';
   setSeg('defSeatSeg', S.cfg.seat); $('anonTail').value = S.cfg.anonTail; $('model').value = S.cfg.model;
   const d = S.drive, info = $('driveInfo'); info.innerHTML = '';
   const p = d.pending;
@@ -508,6 +514,7 @@ $('signOut').onclick = async () => { try { await api('POST', 'api/drive/disconne
 
 // ---------- Boot ----------
 (async function boot() {
+  setupHistoryCard();
   newFlight(false);
   try { await refresh(); if (!S.editId) { S.seat = S.cfg.seat; setSeg('seatSeg', S.seat); update(); } }
   catch (e) { setSync('bad', 'Cannot reach the add-on'); toast(e.message); }
