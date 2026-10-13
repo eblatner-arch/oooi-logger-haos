@@ -64,7 +64,7 @@ Drive upload is optional. Without it, the CSVs are still written to `/share/oooi
 
 You're creating your own small Google "app" that only you use. It lets the add-on put files in your Drive. It can only see the files it creates, never the rest of your Drive.
 
-Google renames these menus now and then. If a label below doesn't match exactly, look for the closest one.
+Menu names below match the Google Cloud console as of October 2026. Google renames things occasionally; if a label doesn't match, look for the closest one.
 
 ### Part A — Create a project and turn on the Drive API
 
@@ -74,47 +74,48 @@ Google renames these menus now and then. If a label below doesn't match exactly,
 3. Open the menu (☰) → **APIs & Services → Library**.
 4. Search for **Google Drive API**, click it, and click **Enable**.
 
-### Part B — Set up the sign-in screen
+### Part B — Set up Google Auth Platform
 
-This is the screen you'll see when you approve the add-on. Google calls it the **OAuth consent screen** (newer consoles show it as **Google Auth Platform**).
+Everything in this part happens in **Google Auth Platform**. Open it from the search bar at the top (type `Google Auth Platform`) or from ☰ → **APIs & Services → OAuth consent screen**. Its left sidebar has **Overview, Branding, Audience, Clients, Data Access, Verification Center, Settings**. You'll use **Audience**, **Data Access** and **Clients**.
 
-5. Menu (☰) → **APIs & Services → OAuth consent screen**. If you see **Get started**, click it.
-6. Fill in:
+5. The first time you open it, click **Get started** and fill in:
    - **App name:** `OOOI Flight Logger`
    - **User support email:** your email
-   - **Audience / User type:** **External**
+   - **Audience:** **External**
    - **Contact information:** your email
 
-   Agree to the policy and click **Create** (or **Save and continue** through each page on older consoles). You can skip the logo, home page, and privacy-policy fields.
-7. Add the permissions the add-on asks for. Open **Data Access** (older consoles: the **Scopes** page) → **Add or remove scopes**, and tick these three:
-   - `.../auth/drive.file` — see, edit, create and delete only the Drive files this app uses
-   - `openid`
-   - `.../auth/userinfo.email` (shown as `email`)
+   Agree to the policy and click **Create**. You can change these later under **Branding**. Skip the logo, home page and privacy-policy fields.
 
-   If `drive.file` isn't in the list, paste `https://www.googleapis.com/auth/drive.file` into **Manually add scopes** → **Add to table**. Click **Update**, then **Save**.
-8. **Publish the app.** Open **Audience** (older consoles: the consent screen's main page) and under **Publishing status** click **Publish app** → **Confirm**. It should now say **In production**.
+6. **Data Access** (left sidebar) → **Add or remove scopes**. Tick:
+   - `.../auth/drive.file` — only the Drive files this app creates
+   - `openid`
+   - `.../auth/userinfo.email`
+
+   If `drive.file` isn't in the list, paste `https://www.googleapis.com/auth/drive.file` into **Manually add scopes** → **Add to table**. Click **Update**, then **Save** at the bottom of the Data Access page.
+
+7. **Audience** (left sidebar). Under **Publishing status**, click **Publish app** → **Confirm**. It should then read **In production**, with a **Back to testing** button under it, and **User type: External**.
 
    Don't skip this. While the app is in **Testing**, Google cancels your sign-in after 7 days and Drive uploads stop.
-   You don't need to submit anything to Google for review. `drive.file` is a non-sensitive permission, so production apps for personal use work right away.
+   The **OAuth user cap** on this page (for example "0 users / 100 user cap") only counts sensitive or restricted scopes. `drive.file` is neither, so it doesn't apply, and you don't need to submit anything under **Verification Center**.
 
 ### Part C — Create the client ID and secret
 
-9. Open **Clients** (older consoles: **APIs & Services → Credentials → Create credentials → OAuth client ID**) → **Create client**.
-10. **Application type:** **TVs and Limited Input devices**. This type matters: it gives you the type-a-code sign-in the add-on uses. Name it anything, for example `Home Assistant`, and click **Create**.
-11. A box shows the **Client ID** (ends in `.apps.googleusercontent.com`) and **Client secret**. Copy both. If the box closes, click the client's name in the list to see them again.
+8. **Clients** (left sidebar) → **Create client**.
+9. **Application type:** **TVs and Limited Input devices**. This type matters: it gives you the type-a-code sign-in the add-on uses. Name it anything, for example `Home Assistant`, and click **Create**.
+10. A box shows the **Client ID** (ends in `.apps.googleusercontent.com`) and **Client secret**. Copy both. If the box closes, click the client's name under **Clients** to see them again.
 
 ### Part D — Put them in Home Assistant
 
-12. In Home Assistant: **Settings → Add-ons → OOOI Flight Logger → Configuration**.
+11. In Home Assistant: **Settings → Add-ons → OOOI Flight Logger → Configuration**.
     Paste the ID into `google_client_id` and the secret into `google_client_secret`. Change `drive_folder` if you want a different folder name. **Save**.
-13. Go to the add-on's **Info** tab and click **Restart**.
+12. Go to the add-on's **Info** tab and click **Restart**.
 
 ### Part E — Connect your Google account
 
-14. Open **Flight Log → Settings → Connect Google**. The app shows a short code and a link, `google.com/device`.
-15. On your phone or any computer, open <https://www.google.com/device>, enter the code, and pick the same Google account as in step 1.
-16. Google warns **"Google hasn't verified this app."** That's expected, because it's your own app. Click **Advanced → Go to OOOI Flight Logger (unsafe)**.
-17. Allow the permissions and finish. Within a few seconds, Flight Log Settings shows **Connected as** your email.
+13. Open **Flight Log → Settings → Connect Google**. The app shows a short code and a link, `google.com/device`.
+14. On your phone or any computer, open <https://www.google.com/device>, enter the code, and pick the same Google account as in step 1.
+15. Google warns **"Google hasn't verified this app."** That's expected, because it's your own app. Click **Advanced → Go to OOOI Flight Logger (unsafe)**.
+16. Allow the permissions and finish. Within a few seconds, Flight Log Settings shows **Connected as** your email.
 
 The add-on creates the folder in your Drive and uploads the files after every change. Tap **Open folder** in Settings to see them.
 
@@ -123,9 +124,9 @@ The add-on creates the folder in your Drive and uploads the files after every ch
 | What you see | Fix |
 |---|---|
 | Settings says to add `google_client_id` and `google_client_secret` | They're missing, or the add-on wasn't restarted after you saved them. |
-| "Google refused the sign-in request" | The client isn't the **TVs and Limited Input devices** type (step 10), or the ID or secret was pasted wrong. Create a new client of the right type. |
-| "Error 403: access_denied" on the Google page | The app is still in **Testing** and your account isn't a test user. Publish it (step 8). |
-| Worked for a week, then "sign-in expired or was revoked" | The app was left in **Testing**. Publish it (step 8), then **Connect Google** again. |
+| "Google refused the sign-in request" | The client isn't the **TVs and Limited Input devices** type (step 9), or the ID or secret was pasted wrong. Create a new client of the right type. |
+| "Error 403: access_denied" on the Google page | The app is still in **Testing** and your account isn't a test user. Publish it under **Audience** (step 7). |
+| Worked for a week, then "sign-in expired or was revoked" | The app was left in **Testing**. Publish it under **Audience** (step 7), then **Connect Google** again. |
 | "Drive sync failed (403) … API has not been used … or it is disabled" | The Drive API isn't turned on for this project (step 4). |
 | The code expired | You have about 30 minutes to enter it. Tap **Connect Google** again for a new code. |
 
