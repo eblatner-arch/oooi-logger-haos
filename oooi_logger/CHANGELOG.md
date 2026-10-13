@@ -1,3 +1,6 @@
+## 2.0.1
+- Fixed: a Drive file you deleted (moved to Drive's trash) kept being updated in the trash instead of being recreated. The add-on now makes a fresh copy in the folder on the next sync.
+
 ## 2.0.0
 - **Stats tab**: totals for any period (all time, last 12 months, last 90 days, or a year), hours by year or month with a table view, top routes, airports and aircraft types, and records.
 - **Currency**: day and night 90-day takeoff and landing currency (14 CFR 61.57) with the date you're current through.

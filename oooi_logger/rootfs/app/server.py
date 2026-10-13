@@ -275,15 +275,23 @@ def create_file(token, name, parent, mime, content):
 
 
 def update_file(token, fid, mime, content):
-    gd('PATCH', f'{DRIVE_UP}/{fid}?uploadType=media', token, content.encode('utf-8'), mime + '; charset=UTF-8')
+    """Replace a file's content. Returns its metadata, including whether it is in Drive's trash."""
+    _, body = gd('PATCH', f'{DRIVE_UP}/{fid}?uploadType=media&fields=id,trashed', token, content.encode('utf-8'), mime + '; charset=UTF-8')
+    try:
+        return json.loads(body or b'{}')
+    except ValueError:
+        return {}
 
 
 def upsert(token, g, key, name, mime, content, folder):
     fid = g.get(key)
     if fid:
         try:
-            update_file(token, fid, mime, content)
-            return fid
+            # Deleting a file in Drive only moves it to the trash, and a trashed file still accepts
+            # updates, so check the result and make a fresh copy instead of writing into the trash.
+            if not update_file(token, fid, mime, content).get('trashed'):
+                return fid
+            log.info('%s is in Drive\'s trash; creating a new copy', name)
         except HttpError as e:
             if e.status != 404:
                 raise
