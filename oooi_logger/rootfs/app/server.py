@@ -81,8 +81,9 @@ def options():
 
 
 def settings():
-    s = {'seat': 'PIC', 'anon_tail': '#002377', 'model': 'B737', 'airline': ''}
+    s = {'seat': 'PIC', 'anon_tail': '#002377', 'model': 'B737'}
     s.update(load('settings.json', {}))
+    s.pop('airline', None)  # setting removed in 1.11.0
     return s
 
 
@@ -674,8 +675,6 @@ class Handler(BaseHTTPRequestHandler):
                     ids = {e['id'] for e in extra}
                     show = [k for k in show_in if isinstance(k, str) and (k in fm.CSV_COLS or k in ids)] if isinstance(show_in, list) else []
                     s['csv_names'], s['csv_off'], s['csv_extra'], s['csv_show'] = names, off, extra, show
-                if 'airline' in data:
-                    s['airline'] = ''.join(ch for ch in str(data['airline'] or '').upper() if ch.isalnum())[:3]
                 save('settings.json', s)
             changed()
             return self._json(200, {'ok': True, 'settings': s})

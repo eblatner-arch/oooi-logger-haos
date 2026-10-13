@@ -34,7 +34,6 @@ Open **Flight Log → Settings** and set:
 
 - **Default seat time**: PIC or SIC.
 - **MFB tail number** and **Model**: the MyFlightbook aircraft every flight imports to. See below.
-- **Airline code** (optional): shown in front of flight numbers in the app, for example `UA` → `UA1234`.
 
 ## Changing the CSV columns (optional)
 

@@ -1,3 +1,6 @@
+## 1.11.0
+- Removed the Airline code setting. Flight numbers show as `Flt 1234`.
+
 ## 1.10.0
 - **Settings → CSV columns → Edit** (was Show): ticked columns now get an editable box on the Log screen, pre-filled in grey with the automatic value. Type over it to change that flight's value; clear it to go back to automatic. Works for Night, Landings, PIC/SIC, Total, tail number, model, and your own added columns.
 - Fixed: with any added column, the Settings column list failed to draw.

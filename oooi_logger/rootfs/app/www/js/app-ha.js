@@ -16,13 +16,13 @@ const $ = (id) => document.getElementById(id);
 const FIELDS = ['date', 'flightNumber', 'tail', 'from', 'to', 'crew', 'out', 'off', 'on', 'in', 'comments'];
 const S = {
   duty: 'PF', seat: 'PIC', editId: null, flights: [],
-  cfg: { seat: 'PIC', anonTail: '#002377', model: 'B737', airline: '' },
+  cfg: { seat: 'PIC', anonTail: '#002377', model: 'B737' },
   drive: {}, scan: {}, scannedTrip: null, poll: null,
 };
 const fmtHM = (min) => (min == null || isNaN(min) ? '--:--' : `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`);
 const todayLocal = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 function toast(t) { const el = $('toast'); el.textContent = t; el.hidden = false; clearTimeout(toast._t); toast._t = setTimeout(() => (el.hidden = true), 3200); }
-const fltNo = (n) => `${S.cfg.airline || ''}${n}`;
+const fltNo = (n) => `Flt ${n}`;
 function setSeg(segId, v) { for (const b of $(segId).querySelectorAll('button')) b.setAttribute('aria-pressed', String(b.dataset.v === v)); }
 
 function readForm() {
@@ -330,7 +330,7 @@ async function refresh() {
   S.flights = st.flights || [];
   S.drive = st.drive || {}; S.scan = st.scan || {}; S.airports = st.airports || {};
   const s = st.settings || {};
-  S.cfg = { seat: s.seat || 'PIC', anonTail: s.anon_tail || '#002377', model: s.model || 'B737', airline: s.airline || '', csvNames: s.csv_names || {}, csvOff: s.csv_off || [], csvExtra: s.csv_extra || [], csvShow: s.csv_show || [] };
+  S.cfg = { seat: s.seat || 'PIC', anonTail: s.anon_tail || '#002377', model: s.model || 'B737', csvNames: s.csv_names || {}, csvOff: s.csv_off || [], csvExtra: s.csv_extra || [], csvShow: s.csv_show || [] };
   S.csvCols = st.csv_columns || CSV_COLS;
   renderCustomFields();
   if (!$('view-log').hidden) update(); S.csvSources = st.csv_sources || CSV_SOURCES;
@@ -355,7 +355,7 @@ $('syncDrive2').onclick = () => $('syncNow').onclick();
 // ---------- Settings ----------
 function renderSettings() {
   renderColumns();
-  setSeg('defSeatSeg', S.cfg.seat); $('anonTail').value = S.cfg.anonTail; $('model').value = S.cfg.model; $('airline').value = S.cfg.airline;
+  setSeg('defSeatSeg', S.cfg.seat); $('anonTail').value = S.cfg.anonTail; $('model').value = S.cfg.model;
   const d = S.drive, info = $('driveInfo'); info.innerHTML = '';
   const p = d.pending;
   $('devCode').hidden = !p;
@@ -384,7 +384,7 @@ function renderSettings() {
 $('saveSettings').onclick = async () => {
   const seat = $('defSeatSeg').querySelector('[aria-pressed="true"]').dataset.v;
   try {
-    await api('PUT', 'api/settings', { seat, anon_tail: $('anonTail').value.trim() || '#002377', model: $('model').value.trim() || 'B737', airline: $('airline').value.trim().toUpperCase() });
+    await api('PUT', 'api/settings', { seat, anon_tail: $('anonTail').value.trim() || '#002377', model: $('model').value.trim() || 'B737' });
     await refresh();
     if (!S.editId) { S.seat = seat; setSeg('seatSeg', seat); update(); }
     toast('Settings saved'); watchSync();

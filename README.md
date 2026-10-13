@@ -26,7 +26,7 @@ For airline pilots who log in [MyFlightbook](https://myflightbook.com): snap a p
    (or click the button above).
 2. Install **OOOI Flight Logger**.
 3. Fill in the **Configuration** tab (all optional — see the Documentation tab for the Gemini key and Google Drive setup), start the add-on, and open **Flight Log** in the sidebar.
-4. In **Flight Log → Settings**, set your MyFlightbook tail number and model, default seat, and airline code.
+4. In **Flight Log → Settings**, set your MyFlightbook tail number and model, and default seat.
 
 Full setup guide: [`oooi_logger/DOCS.md`](oooi_logger/DOCS.md).
 
