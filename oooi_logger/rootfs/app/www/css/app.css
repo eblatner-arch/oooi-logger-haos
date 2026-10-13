@@ -163,12 +163,10 @@ details.card:not([open]) { gap: 0; }
 .colrow input[type=checkbox] { width: 22px; height: 22px; margin: 0; accent-color: var(--accent); }
 .colrow input[type=text] { font-size: 15px; padding: 8px 10px; }
 .colrow.off input[type=text] { opacity: .45; text-decoration: line-through; }
-.extrarow { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 10px; border: 1px solid var(--line); border-radius: 9px; }
-.extrarow .x-name, .extrarow .x-text { font-size: 15px; padding: 8px 10px; }
-.extrarow .x-src { font-size: 15px; padding: 8px 10px; grid-column: 1 / -1; }
-.extrarow .x-text { grid-column: 1 / 2; }
-.extrarow .x-text[hidden] + .x-del { grid-column: 1 / -1; }
-.extrarow .x-name { grid-column: 1 / -1; }
-.extrarow .x-del { padding: 8px 10px; font-size: 14px; }
-.customfields { display: grid; gap: 14px; }
+.extrarow { display: grid; grid-template-columns: 1fr; gap: 6px; padding: 10px; border: 1px solid var(--line); border-radius: 9px; }
+.extrarow input, .extrarow select { font-size: 15px; padding: 8px 10px; }
+.extrarow .x-text[hidden] { display: none; }
+.x-tools { display: grid; grid-template-columns: 44px 44px 1fr; gap: 6px; }
+.x-tools .btn { padding: 8px 10px; font-size: 15px; }
+.customfields { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 12px; }
 .customfields[hidden] { display: none; }

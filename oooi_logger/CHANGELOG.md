@@ -1,3 +1,7 @@
+## 1.8.0
+- Reorder your added columns with ↑ ↓ in Settings. The order applies to the CSV and the Log screen.
+- Fill-in columns on the Log screen sit two per row.
+
 ## 1.7.0
 - The CSV now contains only the columns the app fills in. Removed the always-empty Approaches, Hold, IMC, Simulated Instrument, Ground Simulator, Dual Received, and CFI columns. To log any of them, add your own column in **Settings → CSV columns** set to **Fill in on the Log screen**.
 

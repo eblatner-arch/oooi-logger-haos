@@ -385,15 +385,28 @@ function addExtraRow(x) {
   const text = document.createElement('input'); text.type = 'text'; text.className = 'x-text'; text.value = x.text || '';
   text.placeholder = 'Text, e.g. IFR'; text.autocomplete = 'off'; text.setAttribute('aria-label', 'Text for every flight');
   const del = document.createElement('button'); del.type = 'button'; del.className = 'btn x-del'; del.textContent = 'Remove';
-  del.onclick = () => { row.remove(); S.colsDirty = true; };
+  del.onclick = () => { row.remove(); S.colsDirty = true; syncMoveButtons(); };
+  const move = (dir) => {
+    const sib = dir < 0 ? row.previousElementSibling : row.nextElementSibling; if (!sib) return;
+    if (dir < 0) sib.before(row); else sib.after(row);
+    S.colsDirty = true; syncMoveButtons(); (dir < 0 ? up : down).focus();
+  };
+  const up = document.createElement('button'); up.type = 'button'; up.className = 'btn x-up'; up.textContent = '↑'; up.setAttribute('aria-label', 'Move up'); up.onclick = () => move(-1);
+  const down = document.createElement('button'); down.type = 'button'; down.className = 'btn x-down'; down.textContent = '↓'; down.setAttribute('aria-label', 'Move down'); down.onclick = () => move(1);
   const sync = () => {
     text.hidden = src.value !== 'text' && src.value !== 'field';
     text.placeholder = src.value === 'field' ? 'Pre-filled value (optional)' : 'Text, e.g. IFR';
     text.setAttribute('aria-label', src.value === 'field' ? 'Pre-filled value' : 'Text for every flight');
   }; src.onchange = () => { sync(); S.colsDirty = true; }; sync();
   row.dataset.cid = x.id || '';
-  row.append(name, src, text, del); $('csvExtra').appendChild(row);
+  const tools = document.createElement('div'); tools.className = 'x-tools'; tools.append(up, down, del);
+  row.append(name, src, text, tools); $('csvExtra').appendChild(row);
+  syncMoveButtons();
   return row;
+}
+function syncMoveButtons() {
+  const rows = [...$('csvExtra').querySelectorAll('.extrarow')];
+  rows.forEach((r, i) => { r.querySelector('.x-up').disabled = i === 0; r.querySelector('.x-down').disabled = i === rows.length - 1; });
 }
 function readColumns() {
   const csvNames = {}, csvOff = [];
