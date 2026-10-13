@@ -91,7 +91,7 @@
     </div>
 
     <div class="card" aria-live="polite">
-      <div class="row" style="justify-content:space-between"><span class="label">Will log to MyFlightbook</span><button class="linkbtn" id="showWork" type="button">Show night work →</button></div>
+      <div class="row" style="justify-content:space-between"><span class="label">Will also log automatically</span><button class="linkbtn" id="showWork" type="button">Show night work →</button></div>
       <div id="calcOut"></div>
     </div>
     <div class="confirm" id="delConfirm" hidden>
@@ -171,6 +171,8 @@
     <details class="card" id="csvCard">
       <summary class="label">CSV columns</summary>
       <p class="small" style="margin:0">The defaults are the column names MyFlightbook's import expects, so most people never change these. Untick a column to leave it out, or type a new header to rename it, for example to match a custom property in your MyFlightbook account. Blank means the default name. Changes apply to every CSV, including the ones already in /share and Drive.</p>
+      <p class="small" style="margin:0"><b>Use</b> puts the column in the CSV. <b>Show</b> also shows its value in the <i>Will also log automatically</i> box on the Log screen. ✓ means it's already on the Log screen.</p>
+      <div class="colhead"><span>Use</span><span>Header</span><span>Show</span></div>
       <div id="csvCols" class="cols"></div>
       <span class="label">Your own columns</span>
       <p class="small" style="margin:0">Added to the end of the CSV, in the order listed here (use ↑ ↓ to reorder). Choose where each value comes from:</p>

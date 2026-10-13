@@ -142,7 +142,8 @@ function mfbTime(ms) {
 function mfbDate(iso) { const [y, m, d] = iso.split('-'); return `${+m}/${+d}/${y}`; }
 const num = (v) => (v ? String(v) : '');
 
-function csvRow(f, cfg) {
+// Every value a CSV cell can hold for this flight, by column name (null if the flight is incomplete).
+function csvValues(f, cfg) {
   const r = compute(f);
   if (!r.ok) return null;
   const t = r.t, tot = r.total.toFixed(2).replace(/0$/, '').replace(/\.$/, '');
@@ -162,6 +163,11 @@ function csvRow(f, cfg) {
     'Block Time (OUT to IN)': dec(hrsMs(t.in - t.out)), 'Air Time (OFF to ON)': dec(hrsMs(t.on - t.off)),
     'Departure': f.from, 'Arrival': f.to, 'Pilot Duty (PF/PM)': f.duty || 'PF',
   };
+  return row;
+}
+function csvRow(f, cfg) {
+  const row = csvValues(f, cfg);
+  if (!row) return null;
   const extra = f.extra || {};
   return csvLayout(cfg).cells.map(([kind, v]) => csvCell(kind === 'col' ? (row[v] ?? '') : kind === 'field' ? (extra[v] ?? '') : v)).join(',');
 }
@@ -171,6 +177,8 @@ const dec = (v) => v.toFixed(2).replace(/0$/, '').replace(/\.$/, '');
 // Values a user-added column can copy, besides any standard column.
 const EXTRA_SOURCES = ['Block Time (OUT to IN)', 'Air Time (OFF to ON)', 'Departure', 'Arrival', 'Pilot Duty (PF/PM)'];
 const CSV_SOURCES = CSV_COLS.concat(EXTRA_SOURCES);
+// Standard columns the Log screen already shows as inputs or in its summary.
+const ON_LOG_SCREEN = new Set(['Date', 'Flight Number', 'Route', 'Aircraft Registration', 'Comments', 'Crew Start Time (UTC)', 'Block Out Time', 'Flight Start', 'Flight End', 'Block In Time', 'SIC', 'PIC', 'Total Flight Time', 'Night', 'X-Country']);
 // Columns to write and their header text (cfg.csvOff / csvNames / csvExtra); defaults to CSV_COLS as-is.
 function csvLayout(cfg) {
   const off = new Set(cfg.csvOff || []), names = cfg.csvNames || {};

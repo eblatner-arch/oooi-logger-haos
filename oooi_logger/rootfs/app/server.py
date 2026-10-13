@@ -637,7 +637,7 @@ class Handler(BaseHTTPRequestHandler):
                 for k in ('seat', 'anon_tail', 'model'):
                     if k in data and str(data[k]).strip():
                         s[k] = str(data[k]).strip()
-                if 'csv_names' in data or 'csv_off' in data or 'csv_extra' in data:
+                if any(k in data for k in ('csv_names', 'csv_off', 'csv_extra', 'csv_show')):
                     names = data.get('csv_names', s.get('csv_names')) or {}
                     off = data.get('csv_off', s.get('csv_off')) or []
                     extra_in = data.get('csv_extra', s.get('csv_extra')) or []
@@ -668,7 +668,10 @@ class Handler(BaseHTTPRequestHandler):
                     dup = sorted({h for h in headers if [x.lower() for x in headers].count(h.lower()) > 1})
                     if dup:
                         return self._json(400, {'error': 'Two columns are both named ' + ', '.join(f'"{d}"' for d in dup) + '.'})
-                    s['csv_names'], s['csv_off'], s['csv_extra'] = names, off, extra
+                    show_in = data.get('csv_show', s.get('csv_show')) or []
+                    ids = {e['id'] for e in extra}
+                    show = [k for k in show_in if isinstance(k, str) and (k in fm.CSV_COLS or k in ids)] if isinstance(show_in, list) else []
+                    s['csv_names'], s['csv_off'], s['csv_extra'], s['csv_show'] = names, off, extra, show
                 if 'airline' in data:
                     s['airline'] = ''.join(ch for ch in str(data['airline'] or '').upper() if ch.isalnum())[:3]
                 save('settings.json', s)

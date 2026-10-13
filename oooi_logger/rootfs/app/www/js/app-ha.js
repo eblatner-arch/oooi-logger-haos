@@ -35,6 +35,15 @@ function readForm() {
   for (const el of $('customFields').querySelectorAll('input')) if (el.value.trim()) f.extra[el.dataset.cid] = el.value.trim();
   return f;
 }
+// Columns ticked "Show" in Settings → CSV columns, as [header, value] for this flight.
+function shownValues(f) {
+  const show = new Set(S.cfg.csvShow || []); if (!show.size) return [];
+  const vals = csvValues(f, S.cfg); if (!vals) return [];
+  const off = new Set(S.cfg.csvOff || []), names = S.cfg.csvNames || {}, out = [];
+  for (const c of S.csvCols || CSV_COLS) if (show.has(c) && !off.has(c) && !ON_LOG_SCREEN.has(c)) out.push([(names[c] || '').trim() || c, vals[c]]);
+  for (const x of S.cfg.csvExtra || []) if (show.has(x.id) && x.source !== 'field') out.push([x.name, x.source === 'text' ? x.text : vals[x.source]]);
+  return out;
+}
 // Columns the user added in Settings with "Fill in on the Log screen" get an input here.
 const fieldCols = () => (S.cfg.csvExtra || []).filter((x) => x.source === 'field');
 function renderCustomFields() {
@@ -107,6 +116,12 @@ function update() {
   if (f.flightNumber) chip(fltNo(f.flightNumber));
   if (f.tail) chip(f.tail);
   out.append(calc, chips);
+  const shown = shownValues(f);
+  if (shown.length) {
+    const dl = document.createElement('dl'); dl.className = 'autolist';
+    for (const [k, v] of shown) { const dt = document.createElement('dt'); dt.textContent = k; const dd = document.createElement('dd'); dd.textContent = v || '—'; dl.append(dt, dd); }
+    out.appendChild(dl);
+  }
   return r;
 }
 
@@ -292,7 +307,7 @@ async function refresh() {
   S.flights = st.flights || [];
   S.drive = st.drive || {}; S.scan = st.scan || {}; S.airports = st.airports || {};
   const s = st.settings || {};
-  S.cfg = { seat: s.seat || 'PIC', anonTail: s.anon_tail || '#002377', model: s.model || 'B737', airline: s.airline || '', csvNames: s.csv_names || {}, csvOff: s.csv_off || [], csvExtra: s.csv_extra || [] };
+  S.cfg = { seat: s.seat || 'PIC', anonTail: s.anon_tail || '#002377', model: s.model || 'B737', airline: s.airline || '', csvNames: s.csv_names || {}, csvOff: s.csv_off || [], csvExtra: s.csv_extra || [], csvShow: s.csv_show || [] };
   S.csvCols = st.csv_columns || CSV_COLS;
   renderCustomFields(); S.csvSources = st.csv_sources || CSV_SOURCES;
   statusLine();
@@ -357,15 +372,18 @@ function renderColumns(force) {
   if (!force && (S.colsDirty || $('csvCard').contains(document.activeElement))) return; // don't wipe unsaved edits
   S.colsDirty = false;
   box.innerHTML = '';
-  const off = new Set(cfg.csvOff || []), names = cfg.csvNames || {};
+  const off = new Set(cfg.csvOff || []), names = cfg.csvNames || {}, show = new Set(cfg.csvShow || []);
   for (const c of S.csvCols || CSV_COLS) {
     const row = document.createElement('div'); row.className = 'colrow';
     const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = !off.has(c); cb.dataset.col = c;
     cb.setAttribute('aria-label', `Include ${c}`);
     const inp = document.createElement('input'); inp.type = 'text'; inp.value = names[c] || ''; inp.placeholder = c; inp.dataset.col = c;
     inp.setAttribute('aria-label', `Header for ${c}`); inp.autocomplete = 'off'; inp.spellcheck = false;
-    const sync = () => row.classList.toggle('off', !cb.checked); cb.onchange = sync; sync();
-    row.append(cb, inp); box.appendChild(row);
+    let vis;
+    if (ON_LOG_SCREEN.has(c)) { vis = document.createElement('span'); vis.className = 'onscreen'; vis.textContent = '✓'; vis.title = 'Already on the Log screen'; }
+    else { vis = document.createElement('input'); vis.type = 'checkbox'; vis.className = 'showcb'; vis.checked = show.has(c); vis.dataset.show = c; vis.setAttribute('aria-label', `Show ${c} on the Log screen`); }
+    const sync = () => { row.classList.toggle('off', !cb.checked); if (vis.tagName === 'INPUT') vis.disabled = !cb.checked; }; cb.onchange = sync; sync();
+    row.append(cb, inp, vis); box.appendChild(row);
   }
   const ex = $('csvExtra'); ex.innerHTML = '';
   for (const x of cfg.csvExtra || []) addExtraRow(x);
@@ -394,13 +412,17 @@ function addExtraRow(x) {
   const up = document.createElement('button'); up.type = 'button'; up.className = 'btn x-up'; up.textContent = '↑'; up.setAttribute('aria-label', 'Move up'); up.onclick = () => move(-1);
   const down = document.createElement('button'); down.type = 'button'; down.className = 'btn x-down'; down.textContent = '↓'; down.setAttribute('aria-label', 'Move down'); down.onclick = () => move(1);
   const sync = () => {
+    showLab.hidden = src.value === 'field';   // fill-in columns already have their own box on the Log screen
     text.hidden = src.value !== 'text' && src.value !== 'field';
     text.placeholder = src.value === 'field' ? 'Pre-filled value (optional)' : 'Text, e.g. IFR';
     text.setAttribute('aria-label', src.value === 'field' ? 'Pre-filled value' : 'Text for every flight');
   }; src.onchange = () => { sync(); S.colsDirty = true; }; sync();
-  row.dataset.cid = x.id || '';
+  row.dataset.cid = x.id || 'c' + Math.random().toString(16).slice(2, 10);
+  const showLab = document.createElement('label'); showLab.className = 'x-show';
+  const showCb = document.createElement('input'); showCb.type = 'checkbox'; showCb.checked = (S.cfg.csvShow || []).includes(row.dataset.cid);
+  showLab.append(showCb, document.createTextNode(' Show in Will also log automatically'));
   const tools = document.createElement('div'); tools.className = 'x-tools'; tools.append(up, down, del);
-  row.append(name, src, text, tools); $('csvExtra').appendChild(row);
+  row.append(name, src, text, showLab, tools); $('csvExtra').appendChild(row);
   syncMoveButtons();
   return row;
 }
@@ -410,19 +432,22 @@ function syncMoveButtons() {
 }
 function readColumns() {
   const csvNames = {}, csvOff = [];
+  const csvShow = [];
   for (const el of $('csvCols').querySelectorAll('.colrow input')) {
     const c = el.dataset.col;
+    if (el.dataset.show) { if (el.checked) csvShow.push(el.dataset.show); continue; }
     if (el.type === 'checkbox') { if (!el.checked) csvOff.push(c); }
     else if (el.value.trim() && el.value.trim() !== c) csvNames[c] = el.value.trim();
   }
   const csvExtra = [...$('csvExtra').querySelectorAll('.extrarow')].map((r) => ({
     id: r.dataset.cid || '', name: r.querySelector('.x-name').value.trim(), source: r.querySelector('.x-src').value, text: r.querySelector('.x-text').value,
   }));
-  return { csvNames, csvOff, csvExtra };
+  for (const r of $('csvExtra').querySelectorAll('.extrarow')) if (r.querySelector('.x-show input').checked && r.querySelector('.x-src').value !== 'field') csvShow.push(r.dataset.cid);
+  return { csvNames, csvOff, csvExtra, csvShow };
 }
 async function saveColumns(c) {
   try {
-    await api('PUT', 'api/settings', { csv_names: c.csvNames, csv_off: c.csvOff, csv_extra: c.csvExtra });
+    await api('PUT', 'api/settings', { csv_names: c.csvNames, csv_off: c.csvOff, csv_extra: c.csvExtra, csv_show: c.csvShow });
     document.activeElement && document.activeElement.blur && document.activeElement.blur();
     S.colsDirty = false; await refresh(); renderColumns(true); toast('CSV columns saved'); watchSync();
   } catch (e) { toast(e.message); }
@@ -434,7 +459,7 @@ $('resetCols').onclick = () => {
   const b = $('resetCols');
   if (!b.dataset.armed) { b.dataset.armed = '1'; b.textContent = 'Tap again to reset'; setTimeout(() => { delete b.dataset.armed; b.textContent = 'Reset to defaults'; }, 3000); return; }
   delete b.dataset.armed; b.textContent = 'Reset to defaults';
-  saveColumns({ csvNames: {}, csvOff: [], csvExtra: [] });
+  saveColumns({ csvNames: {}, csvOff: [], csvExtra: [], csvShow: [] });
 };
 
 $('connectGoogle').onclick = async () => {

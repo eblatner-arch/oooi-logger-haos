@@ -1,3 +1,7 @@
+## 1.9.0
+- The Log screen's summary box is now called **Will also log automatically**.
+- **Settings → CSV columns → Show**: tick any column (standard or added) to see its value in that box while you log. Columns already on the Log screen are marked ✓.
+
 ## 1.8.0
 - Reorder your added columns with ↑ ↓ in Settings. The order applies to the CSV and the Log screen.
 - Fill-in columns on the Log screen sit two per row.
