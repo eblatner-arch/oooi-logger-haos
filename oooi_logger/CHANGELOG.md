@@ -1,8 +1,12 @@
+## 1.4.0
+- New **Settings → CSV columns**: rename any CSV header or leave columns out. Defaults are unchanged.
+- Default Gemini model is now `gemini-3.5-flash-lite`. Existing installs keep whatever model is saved in their Configuration.
+- Settings explains how to find your MyFlightbook anonymous aircraft tail number.
+- Expanded Google Drive setup guide.
+
 ## 1.3.0
 - Ready for other pilots: no airline is hard-coded. Set an optional **Airline code** in Settings to show it in front of flight numbers (existing installs: enter your code once in Settings).
 - The Home Screen web app port (8199) is now **off by default** for new installs. Turn it on in the add-on's Network section, and set `app_password` first.
-- Default Gemini model is now `gemini-3.5-flash-lite`. Existing installs keep whatever model is saved in their Configuration.
-- New **Settings → CSV columns**: rename any CSV header or leave columns out. Defaults are unchanged.
 - Clearer Settings help for the MyFlightbook tail number and model.
 - Rewritten documentation and README; MIT license added.
 
