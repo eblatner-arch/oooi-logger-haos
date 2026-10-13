@@ -22,8 +22,21 @@ Log airline flights from the ACARS-PREVIOUS OOOI page and import them into MyFli
 | `google_client_id` | OAuth client ID (type **TVs and Limited Input devices**). Needed for Drive upload. |
 | `google_client_secret` | That client's secret. |
 | `drive_folder` | Drive folder name. Default `OOOI Logger (Home Assistant)`. |
+| `app_password` | Optional password for the direct web app on port 8199. Blank = no login. |
 
 Restart the add-on after changing options.
+
+## iPhone Home Screen app (Safari)
+
+The add-on also serves the app on its own port, **8199**, outside the Home Assistant wrapper.
+
+1. On your iPhone (on home Wi-Fi or Tailscale), open `http://<your-HA-address>:8199` in **Safari**.
+   With Tailscale that is your HA machine's Tailscale name or IP, for example `http://homeassistant:8199`.
+2. Log in if you set `app_password`.
+3. Share → **Add to Home Screen**. You get the OOOI icon and it opens full-screen like an app.
+
+Port 8199 is reachable from anything on your home network or tailnet. Set `app_password` if that matters to you.
+To turn the port off, clear it under the add-on's **Network** section.
 
 ## Google Drive setup (one time)
 

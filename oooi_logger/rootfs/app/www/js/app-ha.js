@@ -6,6 +6,7 @@ const api = async (method, path, body, raw) => {
   else if (body !== undefined) { opts.body = JSON.stringify(body); opts.headers['Content-Type'] = 'application/json'; }
   let r;
   try { r = await fetch(path, opts); } catch (_) { throw new Error('Cannot reach Home Assistant. Check your connection.'); }
+  if (r.status === 401) { location.replace('./'); throw new Error('Log in again.'); }
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(j.error || `Request failed (${r.status})`);
   return j;

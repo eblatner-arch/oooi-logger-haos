@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>OOOI Flight Logger</title>
+<meta name="theme-color" content="#0e1318">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="OOOI">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<div class="wrap" style="max-width:420px;padding-top:40px">
+  <h1>OOOI Flight Logger</h1>
+  <form class="card" id="f">
+    <div class="field"><label for="pw">Password</label><input id="pw" type="password" autocomplete="current-password" autofocus></div>
+    <button class="btn primary block" type="submit">Log in</button>
+    <p class="small" id="err" style="margin:0;color:var(--bad)" hidden></p>
+    <p class="small" style="margin:0">Set or change the password in the add-on's Configuration tab (<code>app_password</code>).</p>
+  </form>
+</div>
+<script>
+document.getElementById('f').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const err = document.getElementById('err'); err.hidden = true;
+  try {
+    const r = await fetch('api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: document.getElementById('pw').value }) });
+    if (r.ok) { location.replace('./'); return; }
+    const j = await r.json().catch(() => ({})); err.textContent = j.error || 'Could not log in.'; err.hidden = false;
+  } catch (_) { err.textContent = 'Cannot reach the add-on. Check that Tailscale is connected.'; err.hidden = false; }
+});
+</script>
+</body>
+</html>

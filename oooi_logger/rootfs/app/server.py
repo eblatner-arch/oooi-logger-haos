@@ -5,6 +5,8 @@ writes MyFlightbook CSVs to /share/oooi_logger, scans OOOI photos with Gemini,
 and uploads the files to Google Drive using a device sign-in (refresh token).
 """
 import base64
+import hashlib
+import hmac
 import json
 import logging
 import mimetypes
@@ -24,6 +26,7 @@ DATA = os.environ.get('OOOI_DATA', '/data')
 SHARE = os.environ.get('OOOI_SHARE', '/share/oooi_logger')
 WWW = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'www')
 PORT = int(os.environ.get('OOOI_PORT', '8099'))
+DIRECT_PORT = int(os.environ.get('OOOI_DIRECT_PORT', '8199'))
 ALLOWED = {'172.30.32.2', '127.0.0.1', '::1'}
 DEV = os.environ.get('OOOI_DEV') == '1'
 SCOPE = 'https://www.googleapis.com/auth/drive.file openid email'
@@ -72,6 +75,7 @@ def options():
         'google_client_id': (o.get('google_client_id') or '').strip(),
         'google_client_secret': (o.get('google_client_secret') or '').strip(),
         'drive_folder': (o.get('drive_folder') or 'OOOI Logger (Home Assistant)').strip(),
+        'app_password': (o.get('app_password') or ''),
     }
 
 
@@ -483,18 +487,65 @@ def changed():
     schedule_sync()
 
 
+def _secret():
+    path = _path('secret.key')
+    try:
+        with open(path, 'rb') as fh:
+            return fh.read()
+    except FileNotFoundError:
+        key = secrets.token_bytes(32)
+        with open(path, 'wb') as fh:
+            fh.write(key)
+        return key
+
+
+def auth_token(password):
+    return hmac.new(_secret(), password.encode('utf-8'), hashlib.sha256).hexdigest()
+
+
+OPEN_PATHS = {'/login.html', '/css/app.css', '/manifest.webmanifest', '/api/login'}
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = 'OOOILogger/1.0'
+    DIRECT = False  # True for the add-on's own port (Safari web app); False for HA ingress
 
     def log_message(self, fmt, *args):
         if DEV:
             log.info('%s %s', self.address_string(), fmt % args)
 
     def _guard(self):
-        if DEV or self.client_address[0] in ALLOWED:
+        if not self.DIRECT:
+            if DEV or self.client_address[0] in ALLOWED:
+                return True
+            self.send_error(403)
+            return False
+        pw = options()['app_password']
+        p = self._route()
+        if not pw or p in OPEN_PATHS or p.startswith('/icons/'):
             return True
-        self.send_error(403)
+        cookie = self.headers.get('Cookie') or ''
+        got = next((c.split('=', 1)[1] for c in (x.strip() for x in cookie.split(';')) if c.startswith('oooi_auth=')), '')
+        if got and hmac.compare_digest(got, auth_token(pw)):
+            return True
+        if self.command == 'GET' and p == '/':
+            self._static('login.html')
+        elif p.startswith('/api/'):
+            self._json(401, {'error': 'Log in again.'})
+        else:
+            self.send_error(401)
         return False
+
+    def _static(self, rel):
+        full = os.path.normpath(os.path.join(WWW, rel))
+        with open(full, 'rb') as fh:
+            body = fh.read()
+        self.send_response(200)
+        self.send_header('Content-Type', mimetypes.guess_type(full)[0] or 'application/octet-stream')
+        self.send_header('Content-Length', str(len(body)))
+        self.send_header('Cache-Control', 'no-cache')
+        self.end_headers()
+        self.wfile.write(body)
 
     def _json(self, code, obj):
         body = json.dumps(obj).encode()
@@ -602,6 +653,24 @@ class Handler(BaseHTTPRequestHandler):
         if not self._guard():
             return
         p = self._route()
+        if p == '/api/login':
+            pw = options()['app_password']
+            try:
+                given = json.loads(self._body() or b'{}').get('password', '')
+            except Exception:
+                given = ''
+            if pw and not hmac.compare_digest(given.encode('utf-8'), pw.encode('utf-8')):
+                time.sleep(1)
+                return self._json(401, {'error': 'Wrong password.'})
+            body = json.dumps({'ok': True}).encode()
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Content-Length', str(len(body)))
+            if pw:
+                self.send_header('Set-Cookie', f'oooi_auth={auth_token(pw)}; Path=/; Max-Age=31536000; HttpOnly; SameSite=Lax')
+            self.end_headers()
+            self.wfile.write(body)
+            return
         if p == '/api/scan':
             try:
                 img = self._body()
@@ -663,7 +732,10 @@ def main():
     log.info('Airport database: %d airports (%s)', len(fm.AP), airports_info()['source'])
     write_local_files()
     srv = ThreadingHTTPServer(('0.0.0.0', PORT), Handler)
-    log.info('OOOI Flight Logger listening on %d (data %s, files %s)', PORT, DATA, SHARE)
+    direct = ThreadingHTTPServer(('0.0.0.0', DIRECT_PORT), type('DirectHandler', (Handler,), {'DIRECT': True}))
+    threading.Thread(target=direct.serve_forever, daemon=True).start()
+    log.info('OOOI Flight Logger listening on %d (ingress) and %d (direct, %s), data %s, files %s', PORT, DIRECT_PORT,
+             'password on' if options()['app_password'] else 'no password', DATA, SHARE)
     if google_state().get('refresh_token'):
         schedule_sync(3)
     srv.serve_forever()
