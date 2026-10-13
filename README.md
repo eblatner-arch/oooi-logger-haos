@@ -11,7 +11,7 @@ For airline pilots who log in [MyFlightbook](https://myflightbook.com): snap a p
 - Day/night takeoff and full-stop landing per 14 CFR 61.57(b) when you were pilot flying
 - Night tab with a route map
 - MyFlightbook import CSV of pending flights, plus a full-log CSV and JSON backup, written to `/share/oooi_logger/` and (optionally) Google Drive
-- CSV column headers can be renamed or turned off in Settings
+- CSV columns can be renamed, turned off, or added in Settings
 - Flights are stored in the add-on, so Home Assistant backups include them
 - Optional full-screen iPhone Home Screen app
 

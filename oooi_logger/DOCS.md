@@ -42,7 +42,10 @@ The CSVs use MyFlightbook's own column names by default, which is what its impor
 
 - **Untick** a column to leave it out of the CSV.
 - **Type a new name** to rename its header, for example to match a custom flight property in your MyFlightbook account. Leave it blank to keep the default.
-- Tap **Save columns**. **Reset to defaults** (tap twice) puts everything back.
+- **+ Add column** adds a new column at the end. Give it a header name, then choose its value:
+  - **Same text on every flight**, for example a `Flight Rules` column set to `IFR`.
+  - **Copy a value**: any standard column (for example a `Multi-Pilot Time` column copying Total Flight Time), or one of these extras: Block Time (OUT to IN), Air Time (OFF to ON), Departure, Arrival, Pilot Duty (PF/PM).
+- Tap **Save columns**. **Reset to defaults** (tap twice) puts every name back, turns all columns on, and removes added columns.
 
 Changes apply to every CSV the add-on writes, in `/share/oooi_logger/` and Drive. Two columns can't share the same name, and at least one must stay on.
 

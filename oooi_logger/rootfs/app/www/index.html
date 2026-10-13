@@ -171,6 +171,10 @@
       <summary class="label">CSV columns</summary>
       <p class="small" style="margin:0">The defaults are the column names MyFlightbook's import expects, so most people never change these. Untick a column to leave it out, or type a new header to rename it, for example to match a custom property in your MyFlightbook account. Blank means the default name. Changes apply to every CSV, including the ones already in /share and Drive.</p>
       <div id="csvCols" class="cols"></div>
+      <span class="label">Added columns</span>
+      <p class="small" style="margin:0">Added columns go at the end. Each one either puts the same text on every flight (for example a <i>Flight Rules</i> column set to <code>IFR</code>) or copies a value the app already works out (for example a <i>Multi-Pilot Time</i> column copying Total Flight Time).</p>
+      <div id="csvExtra" class="cols"></div>
+      <button class="btn" id="addCol" type="button">+ Add column</button>
       <div class="row">
         <button class="btn primary" id="saveCols" type="button">Save columns</button>
         <button class="btn" id="resetCols" type="button">Reset to defaults</button>

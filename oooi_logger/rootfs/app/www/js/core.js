@@ -158,15 +158,28 @@ function csvRow(f, cfg) {
     'Crew Start Time (UTC)': mfbTime(t.crew), 'Block Out Time': mfbTime(t.out), 'Engine Start': mfbTime(t.out),
     'Flight Start': mfbTime(t.off), 'Flight End': mfbTime(t.on), 'Engine End': mfbTime(t.in), 'Block In Time': mfbTime(t.in),
     'Takeoffs (any)': num(r.takeoffs), 'Takeoffs - Night': num(r.nightTakeoffs),
+    // Extra values, only used by columns the user adds in Settings
+    'Block Time (OUT to IN)': dec(hrsMs(t.in - t.out)), 'Air Time (OFF to ON)': dec(hrsMs(t.on - t.off)),
+    'Departure': f.from, 'Arrival': f.to, 'Pilot Duty (PF/PM)': f.duty || 'PF',
   };
-  return csvLayout(cfg).cols.map((c) => csvCell(row[c] ?? '')).join(',');
+  return csvLayout(cfg).cells.map(([kind, v]) => csvCell(kind === 'col' ? (row[v] ?? '') : v)).join(',');
 }
 const csvCell = (v) => (/[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v);
-// Columns to write and their header text (cfg.csvOff / cfg.csvNames); defaults to CSV_COLS as-is.
+const hrsMs = (ms) => Math.round(Math.round(ms / 60000) / 60 * 100) / 100;
+const dec = (v) => v.toFixed(2).replace(/0$/, '').replace(/\.$/, '');
+// Values a user-added column can copy, besides any standard column.
+const EXTRA_SOURCES = ['Block Time (OUT to IN)', 'Air Time (OFF to ON)', 'Departure', 'Arrival', 'Pilot Duty (PF/PM)'];
+const CSV_SOURCES = CSV_COLS.concat(EXTRA_SOURCES);
+// Columns to write and their header text (cfg.csvOff / csvNames / csvExtra); defaults to CSV_COLS as-is.
 function csvLayout(cfg) {
   const off = new Set(cfg.csvOff || []), names = cfg.csvNames || {};
-  const cols = CSV_COLS.filter((c) => !off.has(c));
-  return { cols, headers: cols.map((c) => (names[c] || '').trim() || c) };
+  const std = CSV_COLS.filter((c) => !off.has(c));
+  const cells = std.map((c) => ['col', c]), headers = std.map((c) => (names[c] || '').trim() || c);
+  for (const x of cfg.csvExtra || []) {
+    const src = x.source || 'text';
+    cells.push(src === 'text' ? ['text', x.text || ''] : ['col', src]); headers.push(x.name);
+  }
+  return { cells, headers };
 }
 
 function buildCsv(flights, cfg) {

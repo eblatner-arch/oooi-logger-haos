@@ -268,8 +268,8 @@ async function refresh() {
   S.flights = st.flights || [];
   S.drive = st.drive || {}; S.scan = st.scan || {}; S.airports = st.airports || {};
   const s = st.settings || {};
-  S.cfg = { seat: s.seat || 'PIC', anonTail: s.anon_tail || '#002377', model: s.model || 'B737', airline: s.airline || '', csvNames: s.csv_names || {}, csvOff: s.csv_off || [] };
-  S.csvCols = st.csv_columns || CSV_COLS;
+  S.cfg = { seat: s.seat || 'PIC', anonTail: s.anon_tail || '#002377', model: s.model || 'B737', airline: s.airline || '', csvNames: s.csv_names || {}, csvOff: s.csv_off || [], csvExtra: s.csv_extra || [] };
+  S.csvCols = st.csv_columns || CSV_COLS; S.csvSources = st.csv_sources || CSV_SOURCES;
   statusLine();
   if (!$('view-set').hidden) renderSettings();
   if (!$('view-list').hidden) renderList();
@@ -329,7 +329,7 @@ $('saveSettings').onclick = async () => {
 // ---------- CSV columns ----------
 function renderColumns(force) {
   const cfg = S.cfg, box = $('csvCols');
-  if (!force && (S.colsDirty || box.contains(document.activeElement))) return; // don't wipe unsaved edits
+  if (!force && (S.colsDirty || $('csvCard').contains(document.activeElement))) return; // don't wipe unsaved edits
   S.colsDirty = false;
   box.innerHTML = '';
   const off = new Set(cfg.csvOff || []), names = cfg.csvNames || {};
@@ -342,30 +342,55 @@ function renderColumns(force) {
     const sync = () => row.classList.toggle('off', !cb.checked); cb.onchange = sync; sync();
     row.append(cb, inp); box.appendChild(row);
   }
+  const ex = $('csvExtra'); ex.innerHTML = '';
+  for (const x of cfg.csvExtra || []) addExtraRow(x);
+}
+function addExtraRow(x) {
+  x = x || { name: '', source: 'text', text: '' };
+  const row = document.createElement('div'); row.className = 'extrarow';
+  const name = document.createElement('input'); name.type = 'text'; name.className = 'x-name'; name.value = x.name || '';
+  name.placeholder = 'Header name'; name.autocomplete = 'off'; name.spellcheck = false; name.setAttribute('aria-label', 'Header name');
+  const src = document.createElement('select'); src.className = 'x-src'; src.setAttribute('aria-label', 'Value');
+  const o = (v, t, parent) => { const e = document.createElement('option'); e.value = v; e.textContent = t; (parent || src).appendChild(e); };
+  o('text', 'Same text on every flight');
+  const g = document.createElement('optgroup'); g.label = 'Copy a value'; src.appendChild(g);
+  for (const c of S.csvSources || CSV_SOURCES) o(c, c, g);
+  src.value = x.source || 'text';
+  const text = document.createElement('input'); text.type = 'text'; text.className = 'x-text'; text.value = x.text || '';
+  text.placeholder = 'Text, e.g. IFR'; text.autocomplete = 'off'; text.setAttribute('aria-label', 'Text for every flight');
+  const del = document.createElement('button'); del.type = 'button'; del.className = 'btn x-del'; del.textContent = 'Remove';
+  del.onclick = () => { row.remove(); S.colsDirty = true; };
+  const sync = () => { text.hidden = src.value !== 'text'; }; src.onchange = () => { sync(); S.colsDirty = true; }; sync();
+  row.append(name, src, text, del); $('csvExtra').appendChild(row);
+  return row;
 }
 function readColumns() {
   const csvNames = {}, csvOff = [];
-  for (const el of $('csvCols').querySelectorAll('input')) {
+  for (const el of $('csvCols').querySelectorAll('.colrow input')) {
     const c = el.dataset.col;
     if (el.type === 'checkbox') { if (!el.checked) csvOff.push(c); }
     else if (el.value.trim() && el.value.trim() !== c) csvNames[c] = el.value.trim();
   }
-  return { csvNames, csvOff };
+  const csvExtra = [...$('csvExtra').querySelectorAll('.extrarow')].map((r) => ({
+    name: r.querySelector('.x-name').value.trim(), source: r.querySelector('.x-src').value, text: r.querySelector('.x-text').value,
+  }));
+  return { csvNames, csvOff, csvExtra };
 }
 async function saveColumns(c) {
   try {
-    await api('PUT', 'api/settings', { csv_names: c.csvNames, csv_off: c.csvOff });
+    await api('PUT', 'api/settings', { csv_names: c.csvNames, csv_off: c.csvOff, csv_extra: c.csvExtra });
     document.activeElement && document.activeElement.blur && document.activeElement.blur();
     S.colsDirty = false; await refresh(); renderColumns(true); toast('CSV columns saved'); watchSync();
   } catch (e) { toast(e.message); }
 }
 $('saveCols').onclick = () => saveColumns(readColumns());
-$('csvCols').addEventListener('input', () => { S.colsDirty = true; });
+$('csvCard').addEventListener('input', () => { S.colsDirty = true; });
+$('addCol').onclick = () => { S.colsDirty = true; addExtraRow().querySelector('.x-name').focus(); };
 $('resetCols').onclick = () => {
   const b = $('resetCols');
   if (!b.dataset.armed) { b.dataset.armed = '1'; b.textContent = 'Tap again to reset'; setTimeout(() => { delete b.dataset.armed; b.textContent = 'Reset to defaults'; }, 3000); return; }
   delete b.dataset.armed; b.textContent = 'Reset to defaults';
-  saveColumns({ csvNames: {}, csvOff: [] });
+  saveColumns({ csvNames: {}, csvOff: [], csvExtra: [] });
 };
 
 $('connectGoogle').onclick = async () => {

@@ -479,6 +479,7 @@ def state():
         'scan': {'configured': bool(o['gemini_api_key']), 'model': o['gemini_model']},
         'share_path': SHARE,
         'csv_columns': fm.CSV_COLS,
+        'csv_sources': fm.CSV_SOURCES,
         'airports': airports_info(),
     }
 
@@ -633,21 +634,34 @@ class Handler(BaseHTTPRequestHandler):
                 for k in ('seat', 'anon_tail', 'model'):
                     if k in data and str(data[k]).strip():
                         s[k] = str(data[k]).strip()
-                if 'csv_names' in data or 'csv_off' in data:
+                if 'csv_names' in data or 'csv_off' in data or 'csv_extra' in data:
                     names = data.get('csv_names', s.get('csv_names')) or {}
                     off = data.get('csv_off', s.get('csv_off')) or []
-                    if not isinstance(names, dict) or not isinstance(off, list):
+                    extra_in = data.get('csv_extra', s.get('csv_extra')) or []
+                    if not isinstance(names, dict) or not isinstance(off, list) or not isinstance(extra_in, list):
                         return self._json(400, {'error': 'Bad column settings.'})
+                    if len(extra_in) > 30:
+                        return self._json(400, {'error': 'You can add up to 30 columns.'})
+                    extra = []
+                    for x in extra_in:
+                        x = x if isinstance(x, dict) else {}
+                        name = str(x.get('name') or '').strip()[:80]
+                        src = str(x.get('source') or 'text')
+                        if not name:
+                            return self._json(400, {'error': 'Every added column needs a header name.'})
+                        if src != 'text' and src not in fm.CSV_SOURCES:
+                            return self._json(400, {'error': f'"{name}" has an unknown value.'})
+                        extra.append({'name': name, 'source': src, 'text': str(x.get('text') or '')[:200] if src == 'text' else ''})
                     names = {c: str(names[c]).strip()[:80] for c in fm.CSV_COLS
                              if c in names and str(names[c]).strip() and str(names[c]).strip() != c}
                     off = [c for c in fm.CSV_COLS if c in off]
-                    if len(off) == len(fm.CSV_COLS):
+                    if len(off) == len(fm.CSV_COLS) and not extra:
                         return self._json(400, {'error': 'Keep at least one column.'})
-                    headers = fm.csv_layout({'csv_names': names, 'csv_off': off})[1]
+                    headers = fm.csv_layout({'csv_names': names, 'csv_off': off, 'csv_extra': extra})[1]
                     dup = sorted({h for h in headers if [x.lower() for x in headers].count(h.lower()) > 1})
                     if dup:
                         return self._json(400, {'error': 'Two columns are both named ' + ', '.join(f'"{d}"' for d in dup) + '.'})
-                    s['csv_names'], s['csv_off'] = names, off
+                    s['csv_names'], s['csv_off'], s['csv_extra'] = names, off, extra
                 if 'airline' in data:
                     s['airline'] = ''.join(ch for ch in str(data['airline'] or '').upper() if ch.isalnum())[:3]
                 save('settings.json', s)

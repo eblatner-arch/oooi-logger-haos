@@ -199,6 +199,11 @@ def _mfb_time(ms):
     return f'{d.month}/{d.day}/{d.year} {d:%H:%M}'
 
 
+def _hrs(ms):
+    """Milliseconds to decimal hours, rounded like Total Flight Time."""
+    return round(round(ms / 60000) / 60 * 100) / 100
+
+
 def _dec(v):
     s = f'{v:.2f}'
     if s.endswith('0'):
@@ -226,29 +231,47 @@ def csv_row(f, cfg):
         'Crew Start Time (UTC)': _mfb_time(t['crew']), 'Block Out Time': _mfb_time(t['out']), 'Engine Start': _mfb_time(t['out']),
         'Flight Start': _mfb_time(t['off']), 'Flight End': _mfb_time(t['on']), 'Engine End': _mfb_time(t['in']), 'Block In Time': _mfb_time(t['in']),
         'Takeoffs (any)': str(r['takeoffs']) if r['takeoffs'] else '', 'Takeoffs - Night': str(r['night_takeoffs']) if r['night_takeoffs'] else '',
+        # Extra values, only used by columns the user adds in Settings
+        'Block Time (OUT to IN)': _dec(_hrs(t['in'] - t['out'])),
+        'Air Time (OFF to ON)': _dec(_hrs(t['on'] - t['off'])),
+        'Departure': f['from'], 'Arrival': f['to'], 'Pilot Duty (PF/PM)': f.get('duty') or 'PF',
     }
+
+
+# Values a user-added column can copy, besides any standard column.
+EXTRA_SOURCES = ['Block Time (OUT to IN)', 'Air Time (OFF to ON)', 'Departure', 'Arrival', 'Pilot Duty (PF/PM)']
+CSV_SOURCES = CSV_COLS + EXTRA_SOURCES
 
 
 def csv_layout(cfg):
     """Columns to write and their header text, from the user's column settings.
 
-    csv_off lists columns to leave out; csv_names maps a column to the header
-    text to use instead. With neither set this is exactly CSV_COLS.
+    csv_off lists standard columns to leave out; csv_names maps a standard
+    column to the header text to use instead; csv_extra is a list of added
+    columns, each {name, source, text} where source is 'text' (the same text
+    on every row) or one of CSV_SOURCES. With none set this is exactly CSV_COLS.
+
+    Returns (cells, headers): each cell is ('col', key) or ('text', value).
     """
     off = set(cfg.get('csv_off') or [])
     names = cfg.get('csv_names') or {}
-    cols = [c for c in CSV_COLS if c not in off]
-    return cols, [(names.get(c) or '').strip() or c for c in cols]
+    cells = [('col', c) for c in CSV_COLS if c not in off]
+    headers = [(names.get(c) or '').strip() or c for _, c in cells]
+    for x in cfg.get('csv_extra') or []:
+        src = x.get('source') or 'text'
+        cells.append(('text', x.get('text') or '') if src == 'text' else ('col', src))
+        headers.append(x['name'])
+    return cells, headers
 
 
 def build_csv(flights, cfg):
     rows = sorted(flights, key=lambda f: f.get('date', '') + (f.get('out') or ''))
-    cols, headers = csv_layout(cfg)
+    cells, headers = csv_layout(cfg)
     buf = io.StringIO()
     w = csv.writer(buf, lineterminator='\n')
     w.writerow(headers)
     for f in rows:
         row = csv_row(f, cfg)
         if row:
-            w.writerow([row.get(c, '') for c in cols])
+            w.writerow([row.get(v, '') if kind == 'col' else v for kind, v in cells])
     return buf.getvalue()

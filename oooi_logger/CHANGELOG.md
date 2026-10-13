@@ -1,3 +1,6 @@
+## 1.5.0
+- **Settings → CSV columns → + Add column**: add your own columns at the end of the CSV, filled with fixed text or a copy of any value the app works out (including block time, air time, departure, arrival, and PF/PM).
+
 ## 1.4.0
 - New **Settings → CSV columns**: rename any CSV header or leave columns out. Defaults are unchanged.
 - Default Gemini model is now `gemini-3.5-flash-lite`. Existing installs keep whatever model is saved in their Configuration.
