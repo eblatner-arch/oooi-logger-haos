@@ -1,3 +1,6 @@
+## 2.1.0
+- Stats now show hours as hours:minutes (`3:49`). Prefer decimal? **Settings → Show hours on Stats as → 3.8**. The CSVs are unchanged.
+
 ## 2.0.2
 - Palm Beach International's old code KPBI (and PBI) now counts as its new code KDJT, so older flights show on the map and in Stats as one airport. Your logged and imported flights keep the code as written.
 

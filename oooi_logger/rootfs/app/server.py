@@ -664,6 +664,8 @@ class Handler(BaseHTTPRequestHandler):
                 for k in ('seat', 'anon_tail', 'model'):
                     if k in data and str(data[k]).strip():
                         s[k] = str(data[k]).strip()
+                if data.get('time_fmt') in ('hm', 'dec'):
+                    s['time_fmt'] = data['time_fmt']
                 if any(k in data for k in ('csv_names', 'csv_off', 'csv_extra', 'csv_show')):
                     names = data.get('csv_names', s.get('csv_names')) or {}
                     off = data.get('csv_off', s.get('csv_off')) or []

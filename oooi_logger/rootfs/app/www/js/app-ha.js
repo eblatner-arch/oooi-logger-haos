@@ -335,7 +335,7 @@ async function refresh() {
   S.drive = st.drive || {}; S.scan = st.scan || {}; S.airports = st.airports || {};
   S.historyInfo = st.history || null;
   const s = st.settings || {};
-  S.cfg = { seat: s.seat || 'PIC', anonTail: s.anon_tail || '#002377', model: s.model || 'B737', csvNames: s.csv_names || {}, csvOff: s.csv_off || [], csvExtra: s.csv_extra || [], csvShow: s.csv_show || [] };
+  S.cfg = { seat: s.seat || 'PIC', anonTail: s.anon_tail || '#002377', model: s.model || 'B737', csvNames: s.csv_names || {}, csvOff: s.csv_off || [], csvExtra: s.csv_extra || [], csvShow: s.csv_show || [], timeFmt: s.time_fmt === 'dec' ? 'dec' : 'hm' };
   S.csvCols = st.csv_columns || CSV_COLS;
   renderCustomFields();
   if (!$('view-log').hidden) update(); S.csvSources = st.csv_sources || CSV_SOURCES;
@@ -361,7 +361,7 @@ $('syncDrive2').onclick = () => $('syncNow').onclick();
 function renderSettings() {
   renderColumns(); renderHistoryCard();
   $('histPick').textContent = S.historyInfo ? 'Replace with a new export' : 'Import MyFlightbook logbook';
-  setSeg('defSeatSeg', S.cfg.seat); $('anonTail').value = S.cfg.anonTail; $('model').value = S.cfg.model;
+  setSeg('defSeatSeg', S.cfg.seat); setSeg('timeFmtSeg', S.cfg.timeFmt); $('anonTail').value = S.cfg.anonTail; $('model').value = S.cfg.model;
   const d = S.drive, info = $('driveInfo'); info.innerHTML = '';
   const p = d.pending;
   $('devCode').hidden = !p;
@@ -387,6 +387,11 @@ function renderSettings() {
     : 'Add gemini_api_key (and optionally gemini_model) in the add-on Configuration tab, then restart the add-on to turn on photo scanning.';
   $('aboutLine').textContent = 'Flights are stored on your Home Assistant (included in backups), written to /share/oooi_logger, and uploaded to Google Drive when connected.';
 }
+// Takes effect immediately; it only changes how Stats shows hours, never the CSVs.
+for (const b of $('timeFmtSeg').querySelectorAll('button')) b.onclick = async () => {
+  const v = b.dataset.v; setSeg('timeFmtSeg', v); S.cfg.timeFmt = v; renderHistoryCard();
+  try { await api('PUT', 'api/settings', { time_fmt: v }); } catch (e) { toast(e.message); }
+};
 $('saveSettings').onclick = async () => {
   const seat = $('defSeatSeg').querySelector('[aria-pressed="true"]').dataset.v;
   try {

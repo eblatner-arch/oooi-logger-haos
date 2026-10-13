@@ -7,6 +7,13 @@ const LB = { hist: [], histKey: null, unknown: [], unknownN: 0, period: 'all', v
 const NS = 'http://www.w3.org/2000/svg';
 const svgEl = (tag, attrs, text) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (text != null) e.textContent = text; return e; };
 const fmtNum = (v, d = 0) => (+v || 0).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+// Hours as 3:49 (default) or 3.8, per Settings → Show hours as.
+const fmtH = (v) => {
+  if (S.cfg.timeFmt === 'dec') return fmtNum(v, 1);
+  const m = Math.round((+v || 0) * 60);
+  return `${Math.floor(m / 60).toLocaleString('en-US')}:${String(m % 60).padStart(2, '0')}`;
+};
+const fmtHu = (v) => (S.cfg.timeFmt === 'dec' ? `${fmtH(v)} h` : fmtH(v));   // with a unit only when decimal
 const fmtDate = (iso, opts) => (iso ? new Date(iso + 'T12:00:00Z').toLocaleDateString('en-US', { timeZone: 'UTC', ...(opts || { month: 'short', day: 'numeric', year: 'numeric' }) }) : '—');
 const addDays = (iso, n) => { const d = new Date(iso + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 const todayIso = () => todayLocal();
@@ -156,11 +163,11 @@ function drawBars(svgBox, rows) {
       svg.appendChild(svgEl('path', { d: `M${x},${y(0)}V${y(0) - h + rad}Q${x},${y(0) - h} ${x + rad},${y(0) - h}H${x + bw - rad}Q${x + bw},${y(0) - h} ${x + bw},${y(0) - h + rad}V${y(0)}Z`, fill: 'var(--bar)' }));
     }
     if (i % every === 0) svg.appendChild(svgEl('text', { x: cx, y: H - 6, 'text-anchor': 'middle', 'font-size': 11, fill: 'var(--muted)', 'font-family': 'var(--f-display)' }, rows.length > 12 && !/^\d{4}$/.test(r.label) ? r.label.slice(0, 1) : r.label));
-    if (r === best && r.total > 0) svg.appendChild(svgEl('text', { x: cx, y: y(r.total) - 4, 'text-anchor': 'middle', 'font-size': 11, 'font-weight': 600, fill: 'var(--ink)', 'font-family': 'var(--f-mono)' }, fmtNum(r.total, 0)));
+    if (r === best && r.total > 0) svg.appendChild(svgEl('text', { x: cx, y: y(r.total) - 4, 'text-anchor': 'middle', 'font-size': 11, 'font-weight': 600, fill: 'var(--ink)', 'font-family': 'var(--f-mono)' }, fmtH(r.total)));
     // hit target taller and wider than the bar
-    const hit = svgEl('rect', { x: padL + slot * i, y: padT, width: slot, height: H - padT - padB, fill: 'transparent', tabindex: 0, 'aria-label': `${r.full}: ${fmtNum(r.total, 1)} hours` });
+    const hit = svgEl('rect', { x: padL + slot * i, y: padT, width: slot, height: H - padT - padB, fill: 'transparent', tabindex: 0, 'aria-label': `${r.full}: ${fmtH(r.total)} hours` });
     const showTip = () => {
-      tip.hidden = false; tip.textContent = `${r.full} · ${fmtNum(r.total, 1)} h · ${r.flights} flight${r.flights === 1 ? '' : 's'} · ${fmtNum(r.night, 1)} night · ${r.l} ldg`;
+      tip.hidden = false; tip.textContent = `${r.full} · ${fmtHu(r.total)} · ${r.flights} flight${r.flights === 1 ? '' : 's'} · ${fmtH(r.night)} night · ${r.l} ldg`;
       for (const s of svg.querySelectorAll('.sel')) s.remove();
       svg.insertBefore(svgEl('rect', { class: 'sel', x: padL + slot * i, y: padT, width: slot, height: H - padT - padB, fill: 'var(--accent-soft)' }), svg.firstChild);
     };
@@ -196,8 +203,8 @@ async function renderStats() {
   renderCurrency($('curBox'), all);
 
   const tiles = $('statTiles'); tiles.innerHTML = '';
-  for (const [v, l] of [[fmtNum(t.total, 1), 'Total hours'], [fmtNum(t.pic, 1), 'PIC'], [fmtNum(t.sic, 1), 'SIC'],
-    [fmtNum(t.night, 1), 'Night'], [fmtNum(t.xc, 1), 'Cross-country'], [fmtNum(t.flights), 'Flights'],
+  for (const [v, l] of [[fmtH(t.total), 'Total hours'], [fmtH(t.pic), 'PIC'], [fmtH(t.sic), 'SIC'],
+    [fmtH(t.night), 'Night'], [fmtH(t.xc), 'Cross-country'], [fmtNum(t.flights), 'Flights'],
     [fmtNum(t.l), `Landings · ${fmtNum(t.ln)} night`], [fmtNum(t.airports), 'Airports'], [fmtNum(t.nm), 'Distance nm']]) {
     const s = document.createElement('div'); s.className = 'stat'; const b = document.createElement('b'); b.textContent = v; const sp = document.createElement('span'); sp.textContent = l; s.append(b, sp); tiles.appendChild(s);
   }
@@ -213,7 +220,7 @@ async function renderStats() {
   tb.appendChild(head);
   for (const r of bk.rows.slice().reverse()) {
     const tr = document.createElement('tr');
-    for (const v of [r.full, fmtNum(r.flights), fmtNum(r.total, 1), fmtNum(r.pic, 1), fmtNum(r.sic, 1), fmtNum(r.night, 1), fmtNum(r.l)]) { const td = document.createElement('td'); td.textContent = v; tr.appendChild(td); }
+    for (const v of [r.full, fmtNum(r.flights), fmtH(r.total), fmtH(r.pic), fmtH(r.sic), fmtH(r.night), fmtNum(r.l)]) { const td = document.createElement('td'); td.textContent = v; tr.appendChild(td); }
     tb.appendChild(tr);
   }
 
@@ -225,9 +232,9 @@ async function renderStats() {
     for (const a of new Set(e.r)) aps.set(a, (aps.get(a) || 0) + 1);
     if (e.m) { const k = e.m; types.set(k, (types.get(k) || 0) + e.t); }
   }
-  topList($('topRoutes'), [...pairs].sort((a, b) => b[1].n - a[1].n).slice(0, 8).map(([k, p]) => [k, p.n, `${p.n}× · ${fmtNum(p.h, 0)} h`]), 'No routes in this period.');
+  topList($('topRoutes'), [...pairs].sort((a, b) => b[1].n - a[1].n).slice(0, 8).map(([k, p]) => [k, p.n, `${p.n}× · ${fmtHu(p.h)}`]), 'No routes in this period.');
   topList($('topAirports'), [...aps].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([k, n]) => [k, n, `${fmtNum(n)} visit${n === 1 ? '' : 's'}`]), 'No airports in this period.');
-  topList($('topTypes'), [...types].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([k, h]) => [k, h, `${fmtNum(h, 1)} h`]), 'No aircraft in this period.');
+  topList($('topTypes'), [...types].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([k, h]) => [k, h, `${fmtHu(h)}`]), 'No aircraft in this period.');
 
   // records
   const rec = $('records'); rec.innerHTML = '';
@@ -238,9 +245,9 @@ async function renderStats() {
     const far = flights.map((e) => [e, entryNm(e)]).reduce((a, x) => (x[1] > a[1] ? x : a));
     const months = new Map(); for (const e of flights) months.set(e.d.slice(0, 7), (months.get(e.d.slice(0, 7)) || 0) + e.t);
     const [bm, bh] = [...months].reduce((a, x) => (x[1] > a[1] ? x : a));
-    add('Longest flight', `${fmtNum(longest.t, 1)} h · ${longest.r.join('–')} · ${fmtDate(longest.d)}`);
+    add('Longest flight', `${fmtHu(longest.t)} · ${longest.r.join('–')} · ${fmtDate(longest.d)}`);
     if (far[1] > 0) add('Farthest leg', `${fmtNum(far[1])} nm · ${far[0].r.join('–')} · ${fmtDate(far[0].d)}`);
-    add('Busiest month', `${fmtNum(bh, 1)} h · ${fmtDate(bm + '-15', { month: 'long', year: 'numeric' })}`);
+    add('Busiest month', `${fmtHu(bh)} · ${fmtDate(bm + '-15', { month: 'long', year: 'numeric' })}`);
     add('First flight', `${fmtDate(flights[0].d)} · ${flights[0].r.join('–') || '—'}`);
     add('Most recent', `${fmtDate(flights[flights.length - 1].d)} · ${flights[flights.length - 1].r.join('–') || '—'}`);
   }
@@ -381,7 +388,7 @@ function renderHistoryCard() {
   const h = S.historyInfo, info = $('histInfo');
   $('histRemove').hidden = !h;
   if (!h) { info.textContent = 'No history imported. Your past flights from MyFlightbook can be added to the Stats and Map tabs.'; $('histUnknown').hidden = true; return; }
-  info.textContent = `${fmtNum(h.flights)} flights${h.sim_sessions ? ` and ${h.sim_sessions} simulator sessions` : ''}, ${fmtDate(h.first)} to ${fmtDate(h.last)}, ${fmtNum(h.total_hours, 1)} hours. Imported ${fmtDate(h.imported_at.slice(0, 10))}${h.file ? ` from ${h.file}` : ''}.`;
+  info.textContent = `${fmtNum(h.flights)} flights${h.sim_sessions ? ` and ${h.sim_sessions} simulator sessions` : ''}, ${fmtDate(h.first)} to ${fmtDate(h.last)}, ${fmtH(h.total_hours)} hours. Imported ${fmtDate(h.imported_at.slice(0, 10))}${h.file ? ` from ${h.file}` : ''}.`;
   const u = $('histUnknown');
   u.hidden = !h.unknown_airport_count;
   if (h.unknown_airport_count) u.textContent = `${h.unknown_airport_count} airport code${h.unknown_airport_count === 1 ? ' isn\'t' : 's aren\'t'} in the airport list, so ${h.unknown_airport_count === 1 ? 'it doesn\'t' : 'they don\'t'} show on the map: ${h.unknown_airports.join(', ')}${h.unknown_airport_count > h.unknown_airports.length ? ', …' : ''}. Tap Update airport database below to add most of them.`;
