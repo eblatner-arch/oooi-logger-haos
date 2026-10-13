@@ -33,8 +33,19 @@ Restart the add-on after changing options.
 Open **Flight Log → Settings** and set:
 
 - **Default seat time**: PIC or SIC.
-- **MFB tail number** and **Model**: the aircraft in your MyFlightbook account that every flight imports to (usually an anonymous aircraft). They must match MyFlightbook exactly or the import will not line up.
+- **MFB tail number** and **Model**: the MyFlightbook aircraft every flight imports to. See below.
 - **Airline code** (optional): shown in front of flight numbers in the app, for example `UA` → `UA1234`.
+
+## Finding your MyFlightbook tail number
+
+Airline pilots fly many tails of the same type, so the add-on logs every flight against one **anonymous aircraft** in MyFlightbook and puts the real registration in the Aircraft Registration property.
+
+1. In MyFlightbook, add an aircraft for your type (for example a Boeing 737) and make it **Anonymous** instead of entering a registration.
+2. Go to **My Aircraft** and click that **Anonymous** aircraft.
+3. On its page, under **Tail Number**, you'll see a code starting with `#`, for example `#002377`, with the note "This tailnumber is used internally; you do not need it unless you are importing flights for this aircraft." Importing is exactly what you're doing, so you need it.
+4. In **Flight Log → Settings**, enter that code (including the `#`) as **MFB tail number**, set **Model** to match the aircraft (for example `B737`), and tap **Save settings**.
+
+If the tail number doesn't match, MyFlightbook's import will try to create a new aircraft instead of using yours.
 
 ## iPhone Home Screen app (optional)
 
