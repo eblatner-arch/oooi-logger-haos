@@ -1,0 +1,623 @@
+"""OOOI Flight Logger add-on server (Python standard library only).
+
+Serves the web UI through Home Assistant ingress, keeps flights in /data,
+writes MyFlightbook CSVs to /share/oooi_logger, scans OOOI photos with Gemini,
+and uploads the files to Google Drive using a device sign-in (refresh token).
+"""
+import base64
+import json
+import logging
+import mimetypes
+import os
+import secrets
+import threading
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+from datetime import datetime, timezone
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+import flightmath as fm
+
+DATA = os.environ.get('OOOI_DATA', '/data')
+SHARE = os.environ.get('OOOI_SHARE', '/share/oooi_logger')
+WWW = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'www')
+PORT = int(os.environ.get('OOOI_PORT', '8099'))
+ALLOWED = {'172.30.32.2', '127.0.0.1', '::1'}
+DEV = os.environ.get('OOOI_DEV') == '1'
+SCOPE = 'https://www.googleapis.com/auth/drive.file openid email'
+DRIVE_API = 'https://www.googleapis.com/drive/v3/files'
+DRIVE_UP = 'https://www.googleapis.com/upload/drive/v3/files'
+GOOGLE_TOKEN = os.environ.get('OOOI_GOOGLE_TOKEN', 'https://oauth2.googleapis.com/token')
+GOOGLE_DEVICE = os.environ.get('OOOI_GOOGLE_DEVICE', 'https://oauth2.googleapis.com/device/code')
+GEMINI_BASE = os.environ.get('OOOI_GEMINI', 'https://generativelanguage.googleapis.com/v1beta/models')
+DRIVE_BASE = os.environ.get('OOOI_DRIVE')  # test override for both Drive hosts
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
+log = logging.getLogger('oooi')
+LOCK = threading.RLock()
+
+
+# ---------------- storage ----------------
+def _path(name):
+    return os.path.join(DATA, name)
+
+
+def load(name, default):
+    try:
+        with open(_path(name), encoding='utf-8') as fh:
+            return json.load(fh)
+    except FileNotFoundError:
+        return default
+    except Exception:
+        log.exception('could not read %s', name)
+        return default
+
+
+def save(name, obj):
+    tmp = _path(name + '.tmp')
+    with open(tmp, 'w', encoding='utf-8') as fh:
+        json.dump(obj, fh, indent=1)
+    os.replace(tmp, _path(name))
+
+
+def options():
+    o = load('options.json', {})
+    return {
+        'gemini_api_key': (o.get('gemini_api_key') or '').strip(),
+        'gemini_model': (o.get('gemini_model') or 'gemini-3.8-flash').strip(),
+        'google_client_id': (o.get('google_client_id') or '').strip(),
+        'google_client_secret': (o.get('google_client_secret') or '').strip(),
+        'drive_folder': (o.get('drive_folder') or 'OOOI Logger (Home Assistant)').strip(),
+    }
+
+
+def settings():
+    s = {'seat': 'PIC', 'anon_tail': '#002377', 'model': 'B737'}
+    s.update(load('settings.json', {}))
+    return s
+
+
+def flights():
+    return load('flights.json', {'flights': []})['flights']
+
+
+def now_iso():
+    return datetime.now(timezone.utc).isoformat(timespec='seconds')
+
+
+def write_local_files():
+    """Write CSVs and a JSON backup to /share so they are reachable over Samba too."""
+    with LOCK:
+        fl, cfg = flights(), settings()
+    try:
+        os.makedirs(SHARE, exist_ok=True)
+        files = {
+            'MyFlightbook Import - pending.csv': fm.build_csv([f for f in fl if not f.get('imported')], cfg),
+            'Flight Log - all flights.csv': fm.build_csv(fl, cfg),
+            'flights.json': json.dumps({'app': 'oooi-logger-haos', 'savedAt': now_iso(), 'flights': fl}, indent=1),
+        }
+        for name, content in files.items():
+            tmp = os.path.join(SHARE, name + '.tmp')
+            with open(tmp, 'w', encoding='utf-8') as fh:
+                fh.write(content)
+            os.replace(tmp, os.path.join(SHARE, name))
+    except Exception:
+        log.exception('could not write files to %s', SHARE)
+
+
+# ---------------- HTTP helpers for Google ----------------
+class HttpError(Exception):
+    def __init__(self, status, body):
+        super().__init__(f'HTTP {status}: {body[:300]}')
+        self.status, self.body = status, body
+
+
+def http(method, url, data=None, headers=None, timeout=60):
+    req = urllib.request.Request(url, data=data, method=method, headers=headers or {})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return r.status, r.read()
+    except urllib.error.HTTPError as e:
+        raise HttpError(e.code, e.read().decode('utf-8', 'replace'))
+
+
+def form_post(url, fields):
+    st, body = http('POST', url, urllib.parse.urlencode(fields).encode(), {'Content-Type': 'application/x-www-form-urlencoded'})
+    return json.loads(body)
+
+
+def _drive(url):
+    if DRIVE_BASE:
+        return url.replace('https://www.googleapis.com', DRIVE_BASE)
+    return url
+
+
+# ---------------- Google sign-in (device flow) ----------------
+DEVICE = {'pending': None}
+
+
+def google_state():
+    return load('google.json', {})
+
+
+def start_device_flow():
+    o = options()
+    if not o['google_client_id'] or not o['google_client_secret']:
+        raise ValueError('Add google_client_id and google_client_secret in the add-on Configuration tab first.')
+    res = form_post(GOOGLE_DEVICE, {'client_id': o['google_client_id'], 'scope': SCOPE})
+    pending = {
+        'user_code': res['user_code'], 'verification_url': res.get('verification_url') or res.get('verification_uri'),
+        'expires_at': time.time() + int(res.get('expires_in', 1800)), 'interval': int(res.get('interval', 5)),
+        'device_code': res['device_code'], 'error': None,
+    }
+    DEVICE['pending'] = pending
+    threading.Thread(target=_poll_device, args=(pending,), daemon=True).start()
+    return {k: pending[k] for k in ('user_code', 'verification_url', 'expires_at')}
+
+
+def _poll_device(p):
+    o = options()
+    interval = p['interval']
+    while time.time() < p['expires_at'] and DEVICE['pending'] is p:
+        time.sleep(interval)
+        try:
+            tok = form_post(GOOGLE_TOKEN, {
+                'client_id': o['google_client_id'], 'client_secret': o['google_client_secret'],
+                'device_code': p['device_code'], 'grant_type': 'urn:ietf:params:oauth:grant-type:device_code',
+            })
+        except HttpError as e:
+            err = ''
+            try:
+                err = json.loads(e.body).get('error', '')
+            except Exception:
+                pass
+            if err == 'authorization_pending':
+                continue
+            if err == 'slow_down':
+                interval += 5
+                continue
+            p['error'] = {'access_denied': 'You declined access on the Google page.', 'expired_token': 'The code expired. Start again.'}.get(err, f'Google sign-in failed ({err or e.status}).')
+            return
+        except Exception as e:
+            log.warning('device poll: %s', e)
+            continue
+        email = ''
+        if tok.get('id_token'):
+            try:
+                part = tok['id_token'].split('.')[1]
+                email = json.loads(base64.urlsafe_b64decode(part + '=' * (-len(part) % 4))).get('email', '')
+            except Exception:
+                pass
+        with LOCK:
+            g = google_state()
+            g.update({'refresh_token': tok.get('refresh_token') or g.get('refresh_token'), 'access_token': tok.get('access_token'),
+                      'access_exp': time.time() + int(tok.get('expires_in', 3600)) - 60, 'email': email or g.get('email', ''),
+                      'connected_at': now_iso(), 'last_error': None})
+            save('google.json', g)
+        DEVICE['pending'] = None
+        log.info('Google Drive connected%s', f' as {email}' if email else '')
+        schedule_sync(0.5)
+        return
+    if DEVICE['pending'] is p and not p['error']:
+        p['error'] = 'The code expired. Start again.'
+
+
+def access_token():
+    with LOCK:
+        g = google_state()
+    if not g.get('refresh_token'):
+        raise PermissionError('not connected')
+    if g.get('access_token') and g.get('access_exp', 0) > time.time():
+        return g['access_token']
+    o = options()
+    try:
+        tok = form_post(GOOGLE_TOKEN, {'client_id': o['google_client_id'], 'client_secret': o['google_client_secret'],
+                                       'refresh_token': g['refresh_token'], 'grant_type': 'refresh_token'})
+    except HttpError as e:
+        if e.status in (400, 401):
+            with LOCK:
+                g = google_state()
+                g.update({'refresh_token': None, 'access_token': None,
+                          'last_error': 'Google sign-in expired or was revoked. Connect Google again in Settings.'})
+                save('google.json', g)
+            raise PermissionError('revoked')
+        raise
+    with LOCK:
+        g = google_state()
+        g.update({'access_token': tok['access_token'], 'access_exp': time.time() + int(tok.get('expires_in', 3600)) - 60})
+        save('google.json', g)
+    return tok['access_token']
+
+
+# ---------------- Google Drive ----------------
+def gd(method, url, token, data=None, ctype=None):
+    h = {'Authorization': 'Bearer ' + token}
+    if ctype:
+        h['Content-Type'] = ctype
+    return http(method, _drive(url), data, h)
+
+
+def find_id(token, name, parent=None, mime=None):
+    q = "name = '%s' and trashed = false" % name.replace('\\', '\\\\').replace("'", "\\'")
+    if parent:
+        q += " and '%s' in parents" % parent
+    if mime:
+        q += " and mimeType = '%s'" % mime
+    _, body = gd('GET', f'{DRIVE_API}?q={urllib.parse.quote(q)}&fields=files(id)&spaces=drive&pageSize=1', token)
+    files = json.loads(body).get('files') or []
+    return files[0]['id'] if files else None
+
+
+def create_folder(token, name):
+    _, body = gd('POST', f'{DRIVE_API}?fields=id', token, json.dumps({'name': name, 'mimeType': 'application/vnd.google-apps.folder'}).encode(), 'application/json')
+    return json.loads(body)['id']
+
+
+def create_file(token, name, parent, mime, content):
+    bd = 'oooi' + secrets.token_hex(8)
+    meta = json.dumps({'name': name, 'parents': [parent], 'mimeType': mime})
+    body = (f'--{bd}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n{meta}\r\n'
+            f'--{bd}\r\nContent-Type: {mime}; charset=UTF-8\r\n\r\n{content}\r\n--{bd}--').encode('utf-8')
+    _, res = gd('POST', f'{DRIVE_UP}?uploadType=multipart&fields=id', token, body, f'multipart/related; boundary={bd}')
+    return json.loads(res)['id']
+
+
+def update_file(token, fid, mime, content):
+    gd('PATCH', f'{DRIVE_UP}/{fid}?uploadType=media', token, content.encode('utf-8'), mime + '; charset=UTF-8')
+
+
+def upsert(token, g, key, name, mime, content, folder):
+    fid = g.get(key)
+    if fid:
+        try:
+            update_file(token, fid, mime, content)
+            return fid
+        except HttpError as e:
+            if e.status != 404:
+                raise
+    fid = find_id(token, name, folder)
+    if fid:
+        update_file(token, fid, mime, content)
+    else:
+        fid = create_file(token, name, folder, mime, content)
+    g[key] = fid
+    return fid
+
+
+SYNC = {'timer': None, 'running': False, 'again': False}
+
+
+def schedule_sync(delay=2.0):
+    with LOCK:
+        if SYNC['timer']:
+            SYNC['timer'].cancel()
+        t = threading.Timer(delay, run_sync)
+        t.daemon = True
+        SYNC['timer'] = t
+        t.start()
+
+
+def run_sync():
+    with LOCK:
+        if SYNC['running']:
+            SYNC['again'] = True
+            return
+        SYNC['running'] = True
+    try:
+        do_sync()
+    finally:
+        with LOCK:
+            SYNC['running'] = False
+            again, SYNC['again'] = SYNC['again'], False
+        if again:
+            run_sync()
+
+
+def do_sync():
+    with LOCK:
+        g = google_state()
+    if not g.get('refresh_token'):
+        return False
+    o = options()
+    try:
+        token = access_token()
+        with LOCK:
+            fl, cfg = flights(), settings()
+            g = google_state()
+        folder = g.get('folder_id')
+        if folder:
+            try:
+                _, body = gd('GET', f'{DRIVE_API}/{folder}?fields=id,trashed', token)
+                if json.loads(body).get('trashed'):
+                    folder = None
+            except HttpError as e:
+                if e.status == 404:
+                    folder = None
+                else:
+                    raise
+        if not folder:
+            folder = find_id(token, o['drive_folder'], None, 'application/vnd.google-apps.folder') or create_folder(token, o['drive_folder'])
+            g.update({'folder_id': folder, 'json_id': None, 'pending_id': None, 'all_id': None})
+        upsert(token, g, 'json_id', 'flights.json', 'application/json',
+               json.dumps({'app': 'oooi-logger-haos', 'savedAt': now_iso(), 'flights': fl}, indent=1), folder)
+        upsert(token, g, 'pending_id', 'MyFlightbook Import – pending.csv', 'text/csv',
+               fm.build_csv([f for f in fl if not f.get('imported')], cfg), folder)
+        upsert(token, g, 'all_id', 'Flight Log – all flights.csv', 'text/csv', fm.build_csv(fl, cfg), folder)
+        g.update({'last_sync': now_iso(), 'last_error': None})
+        log.info('Drive sync done (%d flights)', len(fl))
+        ok = True
+    except PermissionError:
+        return False
+    except HttpError as e:
+        msg = ''
+        try:
+            msg = json.loads(e.body)['error']['message']
+        except Exception:
+            pass
+        g['last_error'] = f'Drive sync failed ({e.status}){": " + msg if msg else ""}.'
+        log.warning(g['last_error'])
+        ok = False
+    except Exception as e:
+        g['last_error'] = f'Drive sync failed: {e}'
+        log.warning(g['last_error'])
+        ok = False
+    with LOCK:
+        cur = google_state()
+        for k in ('folder_id', 'json_id', 'pending_id', 'all_id', 'last_sync', 'last_error'):
+            if k in g:
+                cur[k] = g[k]
+        save('google.json', cur)
+    return ok
+
+
+# ---------------- Gemini ----------------
+SCAN_PROMPT = """The image is a photo of a Boeing 737 FMC/CDU screen showing the airline ACARS page titled "ACARS-PREVIOUS OOOI". Read the values under each label:
+- FLT NBR: flight number (digits only)
+- DEP/DES: departure and destination ICAO codes, written like KORD/KDEN
+- CREW, OUT, OFF, ON, IN: four-digit UTC times (HHMM)
+- TRIP: total time written HH:MM
+The screen shows zeros with a slash (Ø). Read them as 0. Do not confuse 1 and 7, 5 and 6, 8 and 0.
+Reply with only one JSON object, for example:
+{"flightNumber":"1234","from":"KORD","to":"KDEN","crew":"1205","out":"1212","off":"1230","on":"1447","in":"1455","trip":"02:50","confidence":"high","notes":""}
+Use null for any value you cannot read with confidence. confidence is "high", "medium" or "low". If the photo is not this ACARS page, return all values null and say what you see in notes."""
+
+
+def gemini_scan(jpeg):
+    o = options()
+    if not o['gemini_api_key']:
+        return 400, {'error': 'Add gemini_api_key in the add-on Configuration tab to scan.'}
+    url = f"{GEMINI_BASE}/{urllib.parse.quote(o['gemini_model'])}:generateContent?key={urllib.parse.quote(o['gemini_api_key'])}"
+    body = json.dumps({
+        'contents': [{'role': 'user', 'parts': [{'text': SCAN_PROMPT}, {'inline_data': {'mime_type': 'image/jpeg', 'data': base64.b64encode(jpeg).decode()}}]}],
+        'generationConfig': {'responseMimeType': 'application/json', 'temperature': 0},
+    }).encode()
+    try:
+        _, res = http('POST', url, body, {'Content-Type': 'application/json'}, timeout=90)
+    except HttpError as e:
+        msg = ''
+        try:
+            msg = json.loads(e.body)['error']['message']
+        except Exception:
+            pass
+        text = {
+            400: 'Gemini rejected the request. Check gemini_api_key in the add-on Configuration.' if 'key' in msg.lower() else f'Gemini error: {msg}',
+            403: 'Gemini refused the key. Check it in the add-on Configuration.',
+            404: f'Gemini has no model named "{o["gemini_model"]}". Change gemini_model in the add-on Configuration.',
+            429: 'Gemini free-tier limit reached. Wait a minute and scan again.',
+        }.get(e.status, f'Gemini error ({e.status}). {msg}')
+        return 502, {'error': text}
+    except Exception as e:
+        return 502, {'error': f'Could not reach Gemini: {e}'}
+    j = json.loads(res)
+    text = ''.join(p.get('text', '') for p in (((j.get('candidates') or [{}])[0].get('content') or {}).get('parts') or []))
+    start, end = text.find('{'), text.rfind('}')
+    if start < 0 or end < start:
+        return 502, {'error': 'Gemini could not read the page clearly. Retake the photo straight on with less glare.'}
+    try:
+        return 200, json.loads(text[start:end + 1])
+    except Exception:
+        return 502, {'error': 'Gemini could not read the page clearly. Retake the photo straight on with less glare.'}
+
+
+# ---------------- API ----------------
+def state():
+    o = options()
+    with LOCK:
+        g, fl, cfg = google_state(), flights(), settings()
+    p = DEVICE['pending']
+    return {
+        'flights': fl, 'settings': cfg,
+        'drive': {
+            'configured': bool(o['google_client_id'] and o['google_client_secret']), 'connected': bool(g.get('refresh_token')),
+            'email': g.get('email', ''), 'last_sync': g.get('last_sync'), 'last_error': g.get('last_error'), 'folder_id': g.get('folder_id'),
+            'folder': o['drive_folder'], 'syncing': SYNC['running'],
+            'pending': ({'user_code': p['user_code'], 'verification_url': p['verification_url'], 'expires_at': p['expires_at'], 'error': p['error']} if p else None),
+        },
+        'scan': {'configured': bool(o['gemini_api_key']), 'model': o['gemini_model']},
+        'share_path': SHARE,
+    }
+
+
+def changed():
+    write_local_files()
+    schedule_sync()
+
+
+class Handler(BaseHTTPRequestHandler):
+    server_version = 'OOOILogger/1.0'
+
+    def log_message(self, fmt, *args):
+        if DEV:
+            log.info('%s %s', self.address_string(), fmt % args)
+
+    def _guard(self):
+        if DEV or self.client_address[0] in ALLOWED:
+            return True
+        self.send_error(403)
+        return False
+
+    def _json(self, code, obj):
+        body = json.dumps(obj).encode()
+        self.send_response(code)
+        self.send_header('Content-Type', 'application/json')
+        self.send_header('Content-Length', str(len(body)))
+        self.send_header('Cache-Control', 'no-store')
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _body(self):
+        n = int(self.headers.get('Content-Length') or 0)
+        if n > 25 * 1024 * 1024:
+            raise ValueError('too large')
+        return self.rfile.read(n) if n else b''
+
+    def _route(self):
+        return urllib.parse.urlparse(self.path).path.rstrip('/') or '/'
+
+    def do_GET(self):
+        if not self._guard():
+            return
+        p = self._route()
+        if p == '/api/state':
+            return self._json(200, state())
+        if p == '/api/csv/pending':
+            with LOCK:
+                csv_text = fm.build_csv([f for f in flights() if not f.get('imported')], settings())
+            body = csv_text.encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/csv; charset=utf-8')
+            self.send_header('Content-Disposition', f'attachment; filename="MyFlightbook Import {datetime.now():%Y-%m-%d}.csv"')
+            self.send_header('Content-Length', str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        # static files
+        rel = 'index.html' if p == '/' else p.lstrip('/')
+        full = os.path.normpath(os.path.join(WWW, rel))
+        if not full.startswith(WWW) or not os.path.isfile(full):
+            self.send_error(404)
+            return
+        with open(full, 'rb') as fh:
+            body = fh.read()
+        self.send_response(200)
+        self.send_header('Content-Type', mimetypes.guess_type(full)[0] or 'application/octet-stream')
+        self.send_header('Content-Length', str(len(body)))
+        self.send_header('Cache-Control', 'no-cache')
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_PUT(self):
+        if not self._guard():
+            return
+        p = self._route()
+        try:
+            data = json.loads(self._body() or b'{}')
+        except Exception:
+            return self._json(400, {'error': 'Bad JSON'})
+        if p.startswith('/api/flights/'):
+            fid = urllib.parse.unquote(p.split('/api/flights/', 1)[1])
+            keep = ('date', 'flightNumber', 'tail', 'from', 'to', 'crew', 'out', 'off', 'on', 'in', 'comments', 'duty', 'seat', 'approaches', 'imported', 'createdAt')
+            f = {k: data.get(k) for k in keep if k in data}
+            f['id'] = fid
+            f['updatedAt'] = now_iso()
+            r = fm.compute(f)
+            if not r['ok']:
+                return self._json(400, {'error': 'Missing ' + ', '.join(r['missing']) + '.'})
+            with LOCK:
+                fl = flights()
+                old = next((x for x in fl if x['id'] == fid), None)
+                f.setdefault('createdAt', (old or {}).get('createdAt') or now_iso())
+                if old and 'imported' not in data:
+                    f['imported'] = old.get('imported', False)
+                fl = [x for x in fl if x['id'] != fid] + [f]
+                save('flights.json', {'flights': fl})
+            changed()
+            return self._json(200, {'ok': True, 'flight': f})
+        if p == '/api/settings':
+            with LOCK:
+                s = settings()
+                for k in ('seat', 'anon_tail', 'model'):
+                    if k in data and str(data[k]).strip():
+                        s[k] = str(data[k]).strip()
+                save('settings.json', s)
+            changed()
+            return self._json(200, {'ok': True, 'settings': s})
+        self._json(404, {'error': 'Not found'})
+
+    def do_DELETE(self):
+        if not self._guard():
+            return
+        p = self._route()
+        if p.startswith('/api/flights/'):
+            fid = urllib.parse.unquote(p.split('/api/flights/', 1)[1])
+            with LOCK:
+                save('flights.json', {'flights': [x for x in flights() if x['id'] != fid]})
+            changed()
+            return self._json(200, {'ok': True})
+        self._json(404, {'error': 'Not found'})
+
+    def do_POST(self):
+        if not self._guard():
+            return
+        p = self._route()
+        if p == '/api/scan':
+            try:
+                img = self._body()
+            except ValueError:
+                return self._json(413, {'error': 'Photo is too large.'})
+            code, res = gemini_scan(img)
+            return self._json(code, res)
+        if p == '/api/flights/mark-imported':
+            n = 0
+            with LOCK:
+                fl = flights()
+                for f in fl:
+                    if not f.get('imported'):
+                        f['imported'], f['importedAt'], f['updatedAt'] = True, now_iso(), now_iso()
+                        n += 1
+                save('flights.json', {'flights': fl})
+            changed()
+            return self._json(200, {'ok': True, 'count': n})
+        if p == '/api/drive/connect':
+            try:
+                return self._json(200, start_device_flow())
+            except ValueError as e:
+                return self._json(400, {'error': str(e)})
+            except HttpError as e:
+                return self._json(502, {'error': f'Google refused the sign-in request ({e.status}). Check the client ID and that its type is "TVs and Limited Input devices".'})
+            except Exception as e:
+                return self._json(502, {'error': f'Could not reach Google: {e}'})
+        if p == '/api/drive/cancel':
+            DEVICE['pending'] = None
+            return self._json(200, {'ok': True})
+        if p == '/api/drive/sync':
+            ok = do_sync()
+            return self._json(200 if ok else 502, {'ok': ok, 'drive': state()['drive']})
+        if p == '/api/drive/disconnect':
+            with LOCK:
+                g = google_state()
+                tok = g.get('refresh_token')
+                save('google.json', {})
+            if tok:
+                try:
+                    form_post('https://oauth2.googleapis.com/revoke', {'token': tok})
+                except Exception:
+                    pass
+            return self._json(200, {'ok': True})
+        self._json(404, {'error': 'Not found'})
+
+
+def main():
+    os.makedirs(DATA, exist_ok=True)
+    write_local_files()
+    srv = ThreadingHTTPServer(('0.0.0.0', PORT), Handler)
+    log.info('OOOI Flight Logger listening on %d (data %s, files %s)', PORT, DATA, SHARE)
+    if google_state().get('refresh_token'):
+        schedule_sync(3)
+    srv.serve_forever()
+
+
+if __name__ == '__main__':
+    main()

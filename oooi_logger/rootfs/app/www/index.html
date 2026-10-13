@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>OOOI Flight Logger</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>OOOI Flight Logger</h1>
+    <div class="sync" id="syncLine"><span class="dot" id="syncDot"></span><span id="syncText">Connecting…</span></div>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" id="tab-log" aria-selected="true">Log</button>
+    <button role="tab" id="tab-list" aria-selected="false">Flights</button>
+    <button role="tab" id="tab-night" aria-selected="false">Night</button>
+    <button role="tab" id="tab-set" aria-selected="false">Settings</button>
+  </nav>
+
+  <!-- LOG -->
+  <section id="view-log" style="display:grid;gap:16px">
+    <div class="card" id="editBanner" hidden>
+      <div class="row" style="justify-content:space-between">
+        <span><b>Editing</b> <span id="editWhat" class="mono"></span></span>
+        <button class="btn" id="cancelEdit" type="button">New flight</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="scan">
+        <button class="btn primary block scanbtn" type="button" tabindex="-1">Scan OOOI page</button>
+        <input type="file" id="photo" accept="image/*" aria-label="Take or choose a photo of the ACARS previous OOOI page">
+      </div>
+      <div class="scan-note" id="scanNote">Take a photo of the ACARS-PREVIOUS OOOI page. Gemini reads the flight number, airports and times. Check them before saving.</div>
+      <img id="thumb" class="thumb" alt="Scanned OOOI page" hidden>
+      <div class="msg" id="scanMsg" hidden></div>
+    </div>
+
+    <div class="card">
+      <div class="field"><label for="date">Date (local at departure)</label><input type="date" id="date"></div>
+      <div class="grid2">
+        <div class="field"><label for="flightNumber">Flight</label><input id="flightNumber" class="mono" inputmode="numeric" autocomplete="off" placeholder="1234"></div>
+        <div class="field"><label for="tail">Registration</label><input id="tail" class="mono up" autocomplete="off" autocapitalize="characters" placeholder="N12345"></div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label for="from">Dep</label><input id="from" class="mono up" maxlength="4" autocomplete="off" autocapitalize="characters" placeholder="ICAO"><span class="small" id="fromName"></span></div>
+        <div class="field"><label for="to">Des</label><input id="to" class="mono up" maxlength="4" autocomplete="off" autocapitalize="characters" placeholder="ICAO"><span class="small" id="toName"></span></div>
+      </div>
+
+      <div class="cdu">
+        <div class="cdu-head"><span>OOOI · UTC</span><span id="cduRoute">----/----</span></div>
+        <div class="cdu-grid">
+          <div class="field"><label for="crew">CREW</label><input id="crew" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="----"></div>
+          <div class="field"><label for="out">OUT</label><input id="out" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="----"></div>
+          <div class="field"><label for="off">OFF</label><input id="off" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="----"></div>
+          <div class="field"><label for="on">ON</label><input id="on" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="----"></div>
+          <div class="field"><label for="in">IN</label><input id="in" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="----"></div>
+        </div>
+        <div class="cdu-foot"><span id="tripCheck">TRIP --:--</span><span id="blockLine">BLOCK --:--  AIR --:--</span></div>
+      </div>
+
+      <div class="field">
+        <span class="label">Duty</span>
+        <div class="seg" id="dutySeg">
+          <button type="button" data-v="PF" aria-pressed="true">PF<small>Logs takeoff + landing</small></button>
+          <button type="button" data-v="PM" aria-pressed="false">PM<small>No takeoff or landing</small></button>
+        </div>
+      </div>
+      <div class="field">
+        <span class="label">Time logged as</span>
+        <div class="seg" id="seatSeg">
+          <button type="button" data-v="PIC" aria-pressed="true">PIC</button>
+          <button type="button" data-v="SIC" aria-pressed="false">SIC</button>
+        </div>
+      </div>
+      <div class="field"><label for="comments">Comments</label><textarea id="comments" rows="2" placeholder="Optional"></textarea></div>
+    </div>
+
+    <div class="card" aria-live="polite">
+      <div class="row" style="justify-content:space-between"><span class="label">Will log to MyFlightbook</span><button class="linkbtn" id="showWork" type="button">Show night work →</button></div>
+      <div id="calcOut"></div>
+    </div>
+    <div class="confirm" id="delConfirm" hidden>
+      <span>Delete this flight? It is removed here and from your Drive files.</span>
+      <div class="row"><button class="btn danger" id="delYes" type="button">Delete flight</button><button class="btn" id="delNo" type="button">Keep it</button></div>
+    </div>
+  </section>
+
+  <!-- LIST -->
+  <section id="view-list" hidden style="display:grid;gap:12px">
+    <div class="card">
+      <div class="summary" id="summary"></div>
+      <div class="row">
+        <button class="btn primary" id="syncNow" type="button">Sync to Drive</button>
+        <button class="btn" id="saveCsv" type="button">Save CSV</button>
+      </div>
+      <div class="row"><button class="btn" id="markImported" type="button">Mark pending as imported</button></div>
+      <div class="confirm" id="impConfirm" hidden>
+        <span id="impText">Mark these flights as imported?</span>
+        <div class="row"><button class="btn primary" id="impYes" type="button">Mark imported</button><button class="btn" id="impNo" type="button">Cancel</button></div>
+      </div>
+      <p class="small" style="margin:0">Your Drive folder (and <b>/share/oooi_logger</b> on Home Assistant) keeps two files: <b>MyFlightbook Import – pending.csv</b> (only flights not yet imported) and <b>Flight Log – all flights.csv</b> (your full backup). Import the pending file, then mark those flights imported here.</p>
+    </div>
+    <div class="list" id="list"></div>
+  </section>
+
+  <!-- NIGHT -->
+  <section id="view-night" hidden style="display:grid;gap:12px">
+    <div class="card" id="nightEmpty">
+      <div class="empty"><b>No flight to show</b><span>Enter or scan a flight on the Log tab, or tap a saved flight in Flights. This tab shows how its night time, takeoff and landing were worked out.</span></div>
+    </div>
+    <div id="nightBody" hidden style="display:grid;gap:12px">
+      <div class="card">
+        <div class="row" style="justify-content:space-between;align-items:baseline">
+          <span class="route mono" id="nRoute" style="font-size:20px;font-weight:600"></span>
+          <span class="small" id="nDate"></span>
+        </div>
+        <div class="calc" id="nStats"></div>
+        <p class="small" id="nSegs" style="margin:0"></p>
+      </div>
+      <div class="card">
+        <span class="label">Sun elevation at the aircraft</span>
+        <div class="chartbox"><svg id="nChart" role="img" aria-label="Sun elevation along the flight"></svg></div>
+        <p class="small" style="margin:0">Night is logged for every minute the sun is below −6° (shaded), from OUT to IN. Before OFF the aircraft is at the departure airport, after ON at the arrival airport, and in between it moves along the great-circle route.</p>
+      </div>
+      <div class="card">
+        <span class="label">Route</span>
+        <div class="mapbox"><svg id="nMap" role="img" aria-label="Route map"></svg></div>
+        <div class="chips"><span class="chip key-day">Day</span><span class="chip key-twi">Civil twilight</span><span class="chip key-night">Night</span></div>
+      </div>
+      <div class="card">
+        <span class="label">Takeoff and landing · 14 CFR 61.57(b)</span>
+        <div id="nOps" style="display:grid;gap:12px"></div>
+        <p class="small" style="margin:0">A takeoff or landing counts as night between one hour after sunset and one hour before sunrise at that airport. Sunset and sunrise use the sun's upper edge at the horizon (−0.833°).</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section id="view-set" hidden style="display:grid;gap:12px">
+    <div class="card">
+      <div class="field">
+        <span class="label">Default seat time</span>
+        <div class="seg" id="defSeatSeg">
+          <button type="button" data-v="PIC" aria-pressed="true">PIC<small>Captain</small></button>
+          <button type="button" data-v="SIC" aria-pressed="false">SIC<small>First officer</small></button>
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label for="anonTail">MFB tail number</label><input id="anonTail" class="mono" value="#002377"></div>
+        <div class="field"><label for="model">Model</label><input id="model" class="mono" value="B737"></div>
+      </div>
+      <p class="small" style="margin:0">Every flight imports to your anonymous 737 tail. The real registration goes in the Aircraft Registration property.</p>
+      <button class="btn primary" id="saveSettings" type="button">Save settings</button>
+    </div>
+    <div class="card">
+      <span class="label">How it calculates</span>
+      <p class="small" style="margin:0">Total time runs from CREW to IN, the same as the TRIP time on the ACARS page. Night time counts every minute from OUT to IN when the sun is more than 6° below the horizon (civil twilight) at the aircraft's position along the great-circle route. A takeoff or landing is night when it falls between one hour after sunset and one hour before sunrise at that airport (14 CFR 61.57(b)). Times are UTC; the date is the local date at departure.</p>
+    </div>
+    <div class="card">
+      <span class="label">Google Drive</span>
+      <p class="small" style="margin:0" id="driveInfo">Loading…</p>
+      <div class="devcode" id="devCode" hidden>
+        <span class="small">On any device, open</span>
+        <a id="devUrl" href="https://www.google.com/device" target="_blank" rel="noopener">google.com/device</a>
+        <span class="small">and enter this code:</span>
+        <b id="devUser" class="mono"></b>
+        <button class="btn" id="copyCode" type="button">Copy code</button>
+        <span class="small" id="devWait">Waiting for you to approve…</span>
+      </div>
+      <div class="row">
+        <button class="btn primary" id="connectGoogle" type="button">Connect Google</button>
+        <button class="btn" id="syncDrive2" type="button" hidden>Sync now</button>
+        <button class="btn" id="signOut" type="button" hidden>Disconnect</button>
+        <button class="btn" id="cancelCode" type="button" hidden>Cancel</button>
+      </div>
+    </div>
+    <div class="card">
+      <span class="label">Photo scanning (Gemini)</span>
+      <p class="small" style="margin:0" id="scanInfo"></p>
+    </div>
+    <div class="card">
+      <span class="label">About</span>
+      <p class="small" style="margin:0" id="aboutLine"></p>
+    </div>
+  </section>
+</div>
+
+<div class="savebar" id="savebar">
+  <div class="inner">
+    <button class="btn danger" id="delBtn" type="button" hidden>Delete</button>
+    <button class="btn primary" id="saveBtn" type="button">Save flight</button>
+  </div>
+</div>
+<div class="toast" id="toast" hidden></div>
+<script src="js/airports.js"></script>
+<script src="js/land.js"></script>
+<script src="js/core.js"></script>
+<script src="js/night.js"></script>
+<script src="js/app-ha.js"></script>
+</body>
+</html>
