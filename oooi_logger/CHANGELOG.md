@@ -1,3 +1,8 @@
+## 2.1.1
+- Map wraps east–west: drag past the date line and the world continues, and routes across the Pacific draw as one unbroken arc.
+- Fit centres on the shortest span that holds all your airports, so a logbook with Asia and Europe frames the right way round.
+- Zooming out stops at one full world, and the view stays between the poles.
+
 ## 2.1.0
 - Stats now show hours as hours:minutes (`3:49`). Prefer decimal? **Settings → Show hours on Stats as → 3.8**. The CSVs are unchanged.
 

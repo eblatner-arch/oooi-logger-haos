@@ -263,41 +263,63 @@ function mapData(es) {
   }
   return { aps, routes };
 }
+// The map wraps east–west: the world is drawn at -360°, 0° and +360°, and the view is kept
+// within one world-width of the centre copy, so panning never runs off the edge.
+const WRAP = [-360, 0, 360];
 function fitView(aps) {
   const pts = [...aps.keys()].map((a) => AP[a]);
-  if (!pts.length) return { x: -180, y: -75, w: 360, h: 150, k: 1 };
-  let minLat = Math.min(...pts.map((p) => p.lat)), maxLat = Math.max(...pts.map((p) => p.lat));
-  let minLon = Math.min(...pts.map((p) => p.lon)), maxLon = Math.max(...pts.map((p) => p.lon));
+  if (!pts.length) return clampView({ x: -180, y: -80, w: 360, h: 160, k: 1 });
+  const minLat = Math.min(...pts.map((p) => p.lat)), maxLat = Math.max(...pts.map((p) => p.lat));
+  // Smallest longitude span that holds every airport, allowing it to cross the date line.
+  const L = [...new Set(pts.map((p) => p.lon))].sort((x, y) => x - y);
+  let gap = -1, gi = 0;
+  for (let i = 0; i < L.length; i++) { const g = (i + 1 < L.length ? L[i + 1] : L[0] + 360) - L[i]; if (g > gap) { gap = g; gi = i; } }
+  const minLon = L.length > 1 ? (gi + 1 < L.length ? L[gi + 1] : L[0]) : L[0];
+  const maxLon = minLon + (L.length > 1 ? 360 - gap : 0);
   const k = Math.cos(((minLat + maxLat) / 2) * RAD);
   let w = (maxLon - minLon) * k, h = maxLat - minLat;
   const pad = Math.max(2, Math.max(w, h) * 0.1); w += pad * 2; h += pad * 2;
   if (w / h < 1.3) w = h * 1.3; else h = Math.max(h, w / 1.9);
-  return { x: ((minLon + maxLon) / 2) * k - w / 2, y: -(minLat + maxLat) / 2 - h / 2, w, h, k };
+  return clampView({ x: ((minLon + maxLon) / 2) * k - w / 2, y: -(minLat + maxLat) / 2 - h / 2, w, h, k });
 }
-function arc(a, b, k) {
-  // great-circle samples, split where the path crosses the 180° meridian
-  const parts = [[]]; let prev = null;
-  for (let i = 0; i <= 24; i++) {
-    const p = gcPoint(a, b, i / 24);
-    if (prev && Math.abs(p.lon - prev.lon) > 180) parts.push([]);
-    parts[parts.length - 1].push(`${(p.lon * k).toFixed(3)},${(-p.lat).toFixed(3)}`); prev = p;
+// Keep the view's centre on the middle world copy, no wider than one world, and inside the poles.
+function clampView(v) {
+  const period = 360 * v.k;
+  if (v.w > period) { const f = period / v.w; v = { ...v, x: v.x + (v.w - period) / 2, y: v.y + (v.h - v.h * f) / 2, w: period, h: v.h * f }; }
+  let cx = v.x + v.w / 2;
+  while (cx > period / 2) { v.x -= period; cx -= period; }
+  while (cx < -period / 2) { v.x += period; cx += period; }
+  if (v.h >= 180) v.y = -v.h / 2; else v.y = Math.min(Math.max(v.y, -90), 90 - v.h);
+  return v;
+}
+function arc(a, b) {
+  // great-circle samples with continuous longitude (no split at the date line)
+  const out = []; let prev = null;
+  for (let i = 0; i <= 32; i++) {
+    const p = gcPoint(a, b, i / 32); let lon = p.lon;
+    if (prev != null) { while (lon - prev > 180) lon -= 360; while (prev - lon > 180) lon += 360; }
+    out.push([lon, -p.lat]); prev = lon;
   }
-  return parts.filter((x) => x.length > 1);
+  return out;
 }
 function drawMapTab() {
   const svg = $('wMap'), d = LB.mapData, v = LB.view;
   svg.innerHTML = '';
   svg.setAttribute('viewBox', `${v.x} ${v.y} ${v.w} ${v.h}`);
   const k = v.k;
-  const g = svgEl('g', { transform: `scale(${k} 1)` });
-  g.appendChild(svgEl('path', { d: LAND_D, fill: 'var(--land)', stroke: 'var(--coast)', 'stroke-width': 0.8, 'vector-effect': 'non-scaling-stroke' }));
+  const defs = svgEl('defs', {});
+  defs.appendChild(svgEl('path', { id: 'wLand', d: LAND_D }));
+  svg.appendChild(defs);
+  const g = svgEl('g', { transform: `scale(${k} 1)`, fill: 'var(--land)', stroke: 'var(--coast)', 'stroke-width': 0.8 });
+  for (const o of WRAP) g.appendChild(svgEl('use', { href: '#wLand', x: o, 'vector-effect': 'non-scaling-stroke' }));
   svg.appendChild(g);
   const maxR = Math.max(1, ...d.routes.values());
   const lines = svgEl('g', { fill: 'none', stroke: 'var(--bar)', 'stroke-linecap': 'round' });
   for (const [key, n] of [...d.routes].sort((a, b) => a[1] - b[1])) {
     const [a, b] = key.split('|');
     const w = 1 + 2.5 * Math.sqrt(n / maxR), op = 0.35 + 0.55 * Math.sqrt(n / maxR);
-    for (const pts of arc(AP[a], AP[b], k)) lines.appendChild(svgEl('polyline', { points: pts.join(' '), 'stroke-width': w.toFixed(2), opacity: op.toFixed(2), 'vector-effect': 'non-scaling-stroke' }));
+    const pts = arc(AP[a], AP[b]);
+    for (const o of WRAP) lines.appendChild(svgEl('polyline', { points: pts.map(([x, y]) => `${((x + o) * k).toFixed(3)},${y.toFixed(3)}`).join(' '), 'stroke-width': w.toFixed(2), opacity: op.toFixed(2), 'vector-effect': 'non-scaling-stroke' }));
   }
   svg.appendChild(lines);
   const maxN = Math.max(1, ...[...d.aps.values()].map((x) => x.n));
@@ -305,17 +327,19 @@ function drawMapTab() {
   const ranked = [...d.aps].sort((a, b) => b[1].n - a[1].n);
   const labelled = new Set(ranked.slice(0, 10).map(([a]) => a));
   if (LB.sel) labelled.add(LB.sel);
-  for (const [code, x] of ranked.slice().reverse()) {
-    const p = AP[code], cx = p.lon * k, cy = -p.lat, r = unit * (2.5 + 5 * Math.sqrt(x.n / maxN));
-    const on = code === LB.sel;
-    svg.appendChild(svgEl('circle', { cx, cy, r, fill: on ? 'var(--accent)' : 'var(--ink)', stroke: 'var(--surface)', 'stroke-width': 1.5, 'vector-effect': 'non-scaling-stroke' }));
-    const hit = svgEl('circle', { cx, cy, r: Math.max(r, unit * 11), fill: 'transparent', 'data-ap': code, tabindex: 0, role: 'button', 'aria-label': `${code}, ${x.n} visits` });
-    svg.appendChild(hit);
-  }
-  for (const code of labelled) {
-    const p = AP[code]; if (!p || !d.aps.has(code)) continue;
-    const fs = unit * 11;
-    svg.appendChild(svgEl('text', { x: p.lon * k + unit * 8, y: -p.lat + fs * 0.35, 'font-size': fs, 'font-weight': 600, fill: 'var(--ink)', 'font-family': 'var(--f-mono)', 'paint-order': 'stroke', stroke: 'var(--water)', 'stroke-width': fs * 0.28, 'pointer-events': 'none' }, code));
+  for (const o of WRAP) {
+    for (const [code, x] of ranked.slice().reverse()) {
+      const p = AP[code], cx = (p.lon + o) * k, cy = -p.lat, r = unit * (2.5 + 5 * Math.sqrt(x.n / maxN));
+      const on = code === LB.sel;
+      svg.appendChild(svgEl('circle', { cx, cy, r, fill: on ? 'var(--accent)' : 'var(--ink)', stroke: 'var(--surface)', 'stroke-width': 1.5, 'vector-effect': 'non-scaling-stroke' }));
+      const hit = svgEl('circle', { cx, cy, r: Math.max(r, unit * 11), fill: 'transparent', 'data-ap': code, tabindex: o === 0 ? 0 : -1, role: 'button', 'aria-label': `${code}, ${x.n} visits` });
+      svg.appendChild(hit);
+    }
+    for (const code of labelled) {
+      const p = AP[code]; if (!p || !d.aps.has(code)) continue;
+      const fs = unit * 11;
+      svg.appendChild(svgEl('text', { x: (p.lon + o) * k + unit * 8, y: -p.lat + fs * 0.35, 'font-size': fs, 'font-weight': 600, fill: 'var(--ink)', 'font-family': 'var(--f-mono)', 'paint-order': 'stroke', stroke: 'var(--water)', 'stroke-width': fs * 0.28, 'pointer-events': 'none' }, code));
+    }
   }
 }
 function selectAirport(code) {
@@ -342,9 +366,9 @@ async function renderMap() {
 }
 function zoomMap(f, cx, cy) {
   const v = LB.view; if (!v) return;
-  const w = Math.min(Math.max(v.w * f, 0.5), 400), h = (w / v.w) * v.h;
+  const w = Math.min(Math.max(v.w * f, 0.5), 360 * v.k), h = (w / v.w) * v.h;
   const px = cx == null ? 0.5 : cx, py = cy == null ? 0.5 : cy;
-  LB.view = { ...v, x: v.x + (v.w - w) * px, y: v.y + (v.h - h) * py, w, h };
+  LB.view = clampView({ ...v, x: v.x + (v.w - w) * px, y: v.y + (v.h - h) * py, w, h });
   drawMapTab();
 }
 function setupMapGestures() {
@@ -358,14 +382,16 @@ function setupMapGestures() {
     if (cur.length === 1 && st.length === 1) {
       const dx = cur[0][0] - st[0][0], dy = cur[0][1] - st[0][1];
       if (Math.abs(dx) + Math.abs(dy) > 0.01) moved = true;
-      LB.view = { ...s, x: s.x - dx * s.w, y: s.y - dy * s.h };
+      const nv = clampView({ ...s, x: s.x - dx * s.w, y: s.y - dy * s.h });
+      s.x += nv.x - (s.x - dx * s.w);   // carry any wrap shift into the drag's start point
+      LB.view = nv;
       $('wMap').setAttribute('viewBox', `${LB.view.x} ${LB.view.y} ${LB.view.w} ${LB.view.h}`);
     } else if (cur.length === 2 && st.length === 2) {
       moved = true;
       const dist = (p) => Math.hypot(p[0][0] - p[1][0], p[0][1] - p[1][1]) || 0.001;
       const f = dist(st) / dist(cur), mx = (st[0][0] + st[1][0]) / 2, my = (st[0][1] + st[1][1]) / 2;
-      const w = Math.min(Math.max(s.w * f, 0.5), 400), h = (w / s.w) * s.h;
-      LB.view = { ...s, x: s.x + (s.w - w) * mx, y: s.y + (s.h - h) * my, w, h };
+      const w = Math.min(Math.max(s.w * f, 0.5), 360 * s.k), h = (w / s.w) * s.h;
+      LB.view = clampView({ ...s, x: s.x + (s.w - w) * mx, y: s.y + (s.h - h) * my, w, h });
       $('wMap').setAttribute('viewBox', `${LB.view.x} ${LB.view.y} ${LB.view.w} ${LB.view.h}`);
     }
   });
