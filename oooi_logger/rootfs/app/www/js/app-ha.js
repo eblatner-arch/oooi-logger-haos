@@ -31,10 +31,34 @@ function readForm() {
   f.from = f.from.toUpperCase(); f.to = f.to.toUpperCase(); f.tail = f.tail.toUpperCase();
   for (const k of ['crew', 'out', 'off', 'on', 'in']) f[k] = f[k].replace(/[^0-9]/g, '');
   f.approaches = 0; f.duty = S.duty; f.seat = S.seat;
+  f.extra = {};
+  for (const el of $('customFields').querySelectorAll('input')) if (el.value.trim()) f.extra[el.dataset.cid] = el.value.trim();
   return f;
+}
+// Columns the user added in Settings with "Fill in on the Log screen" get an input here.
+const fieldCols = () => (S.cfg.csvExtra || []).filter((x) => x.source === 'field');
+function renderCustomFields() {
+  const box = $('customFields'), cols = fieldCols();
+  const sig = JSON.stringify(cols.map((x) => [x.id, x.name, x.text]));
+  if (box.dataset.sig === sig) return;           // unchanged: keep whatever is typed
+  const keep = {}; for (const el of box.querySelectorAll('input')) keep[el.dataset.cid] = el.value;
+  box.dataset.sig = sig; box.innerHTML = ''; box.hidden = !cols.length;
+  for (const x of cols) {
+    const wrap = document.createElement('div'); wrap.className = 'field';
+    const lab = document.createElement('label'); lab.htmlFor = 'cf_' + x.id; lab.textContent = x.name;
+    const inp = document.createElement('input'); inp.id = 'cf_' + x.id; inp.dataset.cid = x.id; inp.autocomplete = 'off';
+    inp.dataset.def = x.text || ''; inp.placeholder = x.text ? '' : 'Optional';
+    inp.value = x.id in keep ? keep[x.id] : (S.editId ? '' : x.text || '');
+    wrap.append(lab, inp); box.appendChild(wrap);
+  }
+}
+function fillCustomFields(extra) {
+  // extra: the flight's saved values, or null for a new flight (use each column's default)
+  for (const el of $('customFields').querySelectorAll('input')) el.value = extra ? (extra[el.dataset.cid] ?? '') : el.dataset.def;
 }
 function fillForm(f) {
   for (const k of FIELDS) $(k).value = f[k] ?? '';
+  fillCustomFields(f.extra || (f.id ? {} : null));
   S.duty = f.duty || 'PF'; S.seat = f.seat || S.cfg.seat; setSeg('dutySeg', S.duty); setSeg('seatSeg', S.seat);
   update();
 }
@@ -269,7 +293,8 @@ async function refresh() {
   S.drive = st.drive || {}; S.scan = st.scan || {}; S.airports = st.airports || {};
   const s = st.settings || {};
   S.cfg = { seat: s.seat || 'PIC', anonTail: s.anon_tail || '#002377', model: s.model || 'B737', airline: s.airline || '', csvNames: s.csv_names || {}, csvOff: s.csv_off || [], csvExtra: s.csv_extra || [] };
-  S.csvCols = st.csv_columns || CSV_COLS; S.csvSources = st.csv_sources || CSV_SOURCES;
+  S.csvCols = st.csv_columns || CSV_COLS;
+  renderCustomFields(); S.csvSources = st.csv_sources || CSV_SOURCES;
   statusLine();
   if (!$('view-set').hidden) renderSettings();
   if (!$('view-list').hidden) renderList();
@@ -346,12 +371,13 @@ function renderColumns(force) {
   for (const x of cfg.csvExtra || []) addExtraRow(x);
 }
 function addExtraRow(x) {
-  x = x || { name: '', source: 'text', text: '' };
+  x = x || { name: '', source: 'field', text: '' };
   const row = document.createElement('div'); row.className = 'extrarow';
   const name = document.createElement('input'); name.type = 'text'; name.className = 'x-name'; name.value = x.name || '';
   name.placeholder = 'Header name'; name.autocomplete = 'off'; name.spellcheck = false; name.setAttribute('aria-label', 'Header name');
   const src = document.createElement('select'); src.className = 'x-src'; src.setAttribute('aria-label', 'Value');
   const o = (v, t, parent) => { const e = document.createElement('option'); e.value = v; e.textContent = t; (parent || src).appendChild(e); };
+  o('field', 'Fill in on the Log screen');
   o('text', 'Same text on every flight');
   const g = document.createElement('optgroup'); g.label = 'Copy a value'; src.appendChild(g);
   for (const c of S.csvSources || CSV_SOURCES) o(c, c, g);
@@ -360,7 +386,12 @@ function addExtraRow(x) {
   text.placeholder = 'Text, e.g. IFR'; text.autocomplete = 'off'; text.setAttribute('aria-label', 'Text for every flight');
   const del = document.createElement('button'); del.type = 'button'; del.className = 'btn x-del'; del.textContent = 'Remove';
   del.onclick = () => { row.remove(); S.colsDirty = true; };
-  const sync = () => { text.hidden = src.value !== 'text'; }; src.onchange = () => { sync(); S.colsDirty = true; }; sync();
+  const sync = () => {
+    text.hidden = src.value !== 'text' && src.value !== 'field';
+    text.placeholder = src.value === 'field' ? 'Pre-filled value (optional)' : 'Text, e.g. IFR';
+    text.setAttribute('aria-label', src.value === 'field' ? 'Pre-filled value' : 'Text for every flight');
+  }; src.onchange = () => { sync(); S.colsDirty = true; }; sync();
+  row.dataset.cid = x.id || '';
   row.append(name, src, text, del); $('csvExtra').appendChild(row);
   return row;
 }
@@ -372,7 +403,7 @@ function readColumns() {
     else if (el.value.trim() && el.value.trim() !== c) csvNames[c] = el.value.trim();
   }
   const csvExtra = [...$('csvExtra').querySelectorAll('.extrarow')].map((r) => ({
-    name: r.querySelector('.x-name').value.trim(), source: r.querySelector('.x-src').value, text: r.querySelector('.x-text').value,
+    id: r.dataset.cid || '', name: r.querySelector('.x-name').value.trim(), source: r.querySelector('.x-src').value, text: r.querySelector('.x-text').value,
   }));
   return { csvNames, csvOff, csvExtra };
 }

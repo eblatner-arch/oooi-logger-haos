@@ -121,7 +121,7 @@ function compute(f) {
   r.nightTO = isNightOp(t.off, a);
   r.nightLdg = isNightOp(t.on, b);
   r.distNm = Math.round(distNm(a, b));
-  const pf = f.duty === 'PF';
+  const pf = (f.duty || 'PF') === 'PF';
   r.landings = pf ? 1 : 0;
   r.fsNight = pf && r.nightLdg ? 1 : 0;
   r.fsDay = pf && !r.nightLdg ? 1 : 0;
@@ -162,7 +162,8 @@ function csvRow(f, cfg) {
     'Block Time (OUT to IN)': dec(hrsMs(t.in - t.out)), 'Air Time (OFF to ON)': dec(hrsMs(t.on - t.off)),
     'Departure': f.from, 'Arrival': f.to, 'Pilot Duty (PF/PM)': f.duty || 'PF',
   };
-  return csvLayout(cfg).cells.map(([kind, v]) => csvCell(kind === 'col' ? (row[v] ?? '') : v)).join(',');
+  const extra = f.extra || {};
+  return csvLayout(cfg).cells.map(([kind, v]) => csvCell(kind === 'col' ? (row[v] ?? '') : kind === 'field' ? (extra[v] ?? '') : v)).join(',');
 }
 const csvCell = (v) => (/[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v);
 const hrsMs = (ms) => Math.round(Math.round(ms / 60000) / 60 * 100) / 100;
@@ -177,7 +178,7 @@ function csvLayout(cfg) {
   const cells = std.map((c) => ['col', c]), headers = std.map((c) => (names[c] || '').trim() || c);
   for (const x of cfg.csvExtra || []) {
     const src = x.source || 'text';
-    cells.push(src === 'text' ? ['text', x.text || ''] : ['col', src]); headers.push(x.name);
+    cells.push(src === 'field' ? ['field', x.id || ''] : src === 'text' ? ['text', x.text || ''] : ['col', src]); headers.push(x.name);
   }
   return { cells, headers };
 }

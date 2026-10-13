@@ -11,6 +11,7 @@ import json
 import logging
 import mimetypes
 import os
+import re
 import secrets
 import threading
 import time
@@ -613,6 +614,8 @@ class Handler(BaseHTTPRequestHandler):
             fid = urllib.parse.unquote(p.split('/api/flights/', 1)[1])
             keep = ('date', 'flightNumber', 'tail', 'from', 'to', 'crew', 'out', 'off', 'on', 'in', 'comments', 'duty', 'seat', 'approaches', 'imported', 'createdAt')
             f = {k: data.get(k) for k in keep if k in data}
+            if isinstance(data.get('extra'), dict):  # values for columns typed in on the Log screen
+                f['extra'] = {str(k)[:16]: str(v)[:500] for k, v in list(data['extra'].items())[:30] if str(v).strip()}
             f['id'] = fid
             f['updatedAt'] = now_iso()
             r = fm.compute(f)
@@ -649,9 +652,13 @@ class Handler(BaseHTTPRequestHandler):
                         src = str(x.get('source') or 'text')
                         if not name:
                             return self._json(400, {'error': 'Every added column needs a header name.'})
-                        if src != 'text' and src not in fm.CSV_SOURCES:
+                        if src not in ('text', 'field') and src not in fm.CSV_SOURCES:
                             return self._json(400, {'error': f'"{name}" has an unknown value.'})
-                        extra.append({'name': name, 'source': src, 'text': str(x.get('text') or '')[:200] if src == 'text' else ''})
+                        cid = str(x.get('id') or '')
+                        if not re.fullmatch(r'[a-z0-9]{1,16}', cid) or any(e['id'] == cid for e in extra):
+                            cid = 'c' + secrets.token_hex(4)
+                        extra.append({'id': cid, 'name': name, 'source': src,
+                                      'text': str(x.get('text') or '')[:200] if src in ('text', 'field') else ''})
                     names = {c: str(names[c]).strip()[:80] for c in fm.CSV_COLS
                              if c in names and str(names[c]).strip() and str(names[c]).strip() != c}
                     off = [c for c in fm.CSV_COLS if c in off]

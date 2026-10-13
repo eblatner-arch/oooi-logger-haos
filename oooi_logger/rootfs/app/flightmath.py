@@ -179,7 +179,7 @@ def compute(f):
     r['night'] = round(r['night_min'] / 60 * 100) / 100
     r['night_to'] = is_night_op(t['off'], a)
     r['night_ldg'] = is_night_op(t['on'], b)
-    pf = f.get('duty', 'PF') == 'PF'
+    pf = (f.get('duty') or 'PF') == 'PF'
     r['landings'] = 1 if pf else 0
     r['fs_night'] = 1 if pf and r['night_ldg'] else 0
     r['fs_day'] = 1 if pf and not r['night_ldg'] else 0
@@ -248,10 +248,13 @@ def csv_layout(cfg):
 
     csv_off lists standard columns to leave out; csv_names maps a standard
     column to the header text to use instead; csv_extra is a list of added
-    columns, each {name, source, text} where source is 'text' (the same text
-    on every row) or one of CSV_SOURCES. With none set this is exactly CSV_COLS.
+    columns, each {id, name, source, text} where source is 'field' (typed in
+    per flight on the Log screen, stored in flight['extra'][id]), 'text' (the
+    same text on every row) or one of CSV_SOURCES. With none set this is
+    exactly CSV_COLS.
 
-    Returns (cells, headers): each cell is ('col', key) or ('text', value).
+    Returns (cells, headers): each cell is ('col', key), ('field', id) or
+    ('text', value).
     """
     off = set(cfg.get('csv_off') or [])
     names = cfg.get('csv_names') or {}
@@ -259,7 +262,12 @@ def csv_layout(cfg):
     headers = [(names.get(c) or '').strip() or c for _, c in cells]
     for x in cfg.get('csv_extra') or []:
         src = x.get('source') or 'text'
-        cells.append(('text', x.get('text') or '') if src == 'text' else ('col', src))
+        if src == 'field':
+            cells.append(('field', x.get('id') or ''))
+        elif src == 'text':
+            cells.append(('text', x.get('text') or ''))
+        else:
+            cells.append(('col', src))
         headers.append(x['name'])
     return cells, headers
 
@@ -273,5 +281,7 @@ def build_csv(flights, cfg):
     for f in rows:
         row = csv_row(f, cfg)
         if row:
-            w.writerow([row.get(v, '') if kind == 'col' else v for kind, v in cells])
+            extra = f.get('extra') or {}
+            w.writerow([row.get(v, '') if kind == 'col' else extra.get(v, '') if kind == 'field' else v
+                        for kind, v in cells])
     return buf.getvalue()

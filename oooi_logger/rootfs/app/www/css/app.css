@@ -170,3 +170,5 @@ details.card:not([open]) { gap: 0; }
 .extrarow .x-text[hidden] + .x-del { grid-column: 1 / -1; }
 .extrarow .x-name { grid-column: 1 / -1; }
 .extrarow .x-del { padding: 8px 10px; font-size: 14px; }
+.customfields { display: grid; gap: 14px; }
+.customfields[hidden] { display: none; }

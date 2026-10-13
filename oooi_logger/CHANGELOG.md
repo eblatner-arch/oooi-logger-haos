@@ -1,3 +1,7 @@
+## 1.6.0
+- Added columns can now be **filled in on the Log screen**: each one gets its own box under Comments, with an optional pre-filled value for new flights.
+- Clearer explanation of the three kinds of added column in Settings.
+
 ## 1.5.0
 - **Settings → CSV columns → + Add column**: add your own columns at the end of the CSV, filled with fixed text or a copy of any value the app works out (including block time, air time, departure, arrival, and PF/PM).
 

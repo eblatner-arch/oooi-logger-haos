@@ -87,6 +87,7 @@
         </div>
       </div>
       <div class="field"><label for="comments">Comments</label><textarea id="comments" rows="2" placeholder="Optional"></textarea></div>
+      <div id="customFields" class="customfields" hidden></div>
     </div>
 
     <div class="card" aria-live="polite">
@@ -171,8 +172,13 @@
       <summary class="label">CSV columns</summary>
       <p class="small" style="margin:0">The defaults are the column names MyFlightbook's import expects, so most people never change these. Untick a column to leave it out, or type a new header to rename it, for example to match a custom property in your MyFlightbook account. Blank means the default name. Changes apply to every CSV, including the ones already in /share and Drive.</p>
       <div id="csvCols" class="cols"></div>
-      <span class="label">Added columns</span>
-      <p class="small" style="margin:0">Added columns go at the end. Each one either puts the same text on every flight (for example a <i>Flight Rules</i> column set to <code>IFR</code>) or copies a value the app already works out (for example a <i>Multi-Pilot Time</i> column copying Total Flight Time).</p>
+      <span class="label">Your own columns</span>
+      <p class="small" style="margin:0">Added to the end of the CSV. Choose where each value comes from:</p>
+      <ul class="small" style="margin:0;padding-left:18px">
+        <li><b>Fill in on the Log screen</b>: a box appears under Comments for every flight.</li>
+        <li><b>Same text on every flight</b>: for example <i>Flight Rules</i> = <code>IFR</code>.</li>
+        <li><b>Copy a value</b>: for example <i>Multi-Pilot Time</i> copying Total Flight Time.</li>
+      </ul>
       <div id="csvExtra" class="cols"></div>
       <button class="btn" id="addCol" type="button">+ Add column</button>
       <div class="row">
