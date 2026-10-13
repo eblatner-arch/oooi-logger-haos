@@ -616,6 +616,8 @@ class Handler(BaseHTTPRequestHandler):
             f = {k: data.get(k) for k in keep if k in data}
             if isinstance(data.get('extra'), dict):  # values for columns typed in on the Log screen
                 f['extra'] = {str(k)[:16]: str(v)[:500] for k, v in list(data['extra'].items())[:30] if str(v).strip()}
+            if isinstance(data.get('override'), dict):  # per-flight edits to automatic columns
+                f['override'] = {str(k)[:80]: str(v)[:500] for k, v in list(data['override'].items())[:60] if str(v).strip()}
             f['id'] = fid
             f['updatedAt'] = now_iso()
             r = fm.compute(f)

@@ -31,43 +31,67 @@ function readForm() {
   f.from = f.from.toUpperCase(); f.to = f.to.toUpperCase(); f.tail = f.tail.toUpperCase();
   for (const k of ['crew', 'out', 'off', 'on', 'in']) f[k] = f[k].replace(/[^0-9]/g, '');
   f.approaches = 0; f.duty = S.duty; f.seat = S.seat;
-  f.extra = {};
-  for (const el of $('customFields').querySelectorAll('input')) if (el.value.trim()) f.extra[el.dataset.cid] = el.value.trim();
+  f.extra = {}; f.override = {};
+  for (const el of $('customFields').querySelectorAll('input')) {
+    const v = el.value.trim(); if (!v) continue;
+    if (el.dataset.kind === 'field') f.extra[el.dataset.key] = v; else f.override[el.dataset.key] = v;
+  }
   return f;
 }
-// Columns ticked "Show" in Settings → CSV columns, as [header, value] for this flight.
-function shownValues(f) {
-  const show = new Set(S.cfg.csvShow || []); if (!show.size) return [];
-  const vals = csvValues(f, S.cfg); if (!vals) return [];
-  const off = new Set(S.cfg.csvOff || []), names = S.cfg.csvNames || {}, out = [];
-  for (const c of S.csvCols || CSV_COLS) if (show.has(c) && !off.has(c) && !ON_LOG_SCREEN.has(c)) out.push([(names[c] || '').trim() || c, vals[c]]);
-  for (const x of S.cfg.csvExtra || []) if (show.has(x.id) && x.source !== 'field') out.push([x.name, x.source === 'text' ? x.text : vals[x.source]]);
+// Boxes under Comments: added "fill in" columns, plus any column ticked "Edit" in
+// Settings → CSV columns. Edit boxes show the automatic value as grey placeholder
+// text; typing overrides it for this flight, clearing it goes back to automatic.
+function logBoxes() {
+  const show = new Set(S.cfg.csvShow || []), off = new Set(S.cfg.csvOff || []), names = S.cfg.csvNames || {}, out = [];
+  for (const c of S.csvCols || CSV_COLS) if (show.has(c) && !off.has(c) && !ON_LOG_SCREEN.has(c)) out.push({ kind: 'ov', key: c, label: (names[c] || '').trim() || c });
+  for (const x of S.cfg.csvExtra || []) {
+    if (x.source === 'field') out.push({ kind: 'field', key: x.id, label: x.name, def: x.text || '' });
+    else if (show.has(x.id)) out.push({ kind: 'ov', key: x.id, label: x.name, src: x.source, text: x.text || '' });
+  }
   return out;
 }
-// Columns the user added in Settings with "Fill in on the Log screen" get an input here.
-const fieldCols = () => (S.cfg.csvExtra || []).filter((x) => x.source === 'field');
 function renderCustomFields() {
-  const box = $('customFields'), cols = fieldCols();
-  const sig = JSON.stringify(cols.map((x) => [x.id, x.name, x.text]));
+  const box = $('customFields'), boxes = logBoxes();
+  const sig = JSON.stringify(boxes);
   if (box.dataset.sig === sig) return;           // unchanged: keep whatever is typed
-  const keep = {}; for (const el of box.querySelectorAll('input')) keep[el.dataset.cid] = el.value;
-  box.dataset.sig = sig; box.innerHTML = ''; box.hidden = !cols.length;
-  for (const x of cols) {
+  const keep = {}; for (const el of box.querySelectorAll('input')) keep[el.dataset.kind + ':' + el.dataset.key] = el.value;
+  box.dataset.sig = sig; box.innerHTML = ''; box.hidden = !boxes.length;
+  for (const b of boxes) {
     const wrap = document.createElement('div'); wrap.className = 'field';
-    const lab = document.createElement('label'); lab.htmlFor = 'cf_' + x.id; lab.textContent = x.name;
-    const inp = document.createElement('input'); inp.id = 'cf_' + x.id; inp.dataset.cid = x.id; inp.autocomplete = 'off';
-    inp.dataset.def = x.text || ''; inp.placeholder = x.text ? '' : 'Optional';
-    inp.value = x.id in keep ? keep[x.id] : (S.editId ? '' : x.text || '');
+    const id = 'cf_' + b.kind + '_' + b.key.replace(/[^A-Za-z0-9]/g, '_');
+    const lab = document.createElement('label'); lab.htmlFor = id; lab.textContent = b.label;
+    const inp = document.createElement('input'); inp.id = id; inp.autocomplete = 'off';
+    inp.dataset.kind = b.kind; inp.dataset.key = b.key;
+    if (b.kind === 'field') { inp.dataset.def = b.def; inp.placeholder = b.def ? '' : 'Optional'; }
+    else { inp.className = 'mono'; inp.dataset.src = b.src || b.key; inp.dataset.text = b.text || ''; inp.dataset.isText = b.src === 'text' ? '1' : ''; }
+    const k = b.kind + ':' + b.key;
+    inp.value = k in keep ? keep[k] : (b.kind === 'field' && !S.editId ? b.def : '');
+    const mark = () => inp.classList.toggle('edited', inp.dataset.kind === 'ov' && !!inp.value.trim());
+    inp.addEventListener('input', () => { mark(); update(); }); mark();
     wrap.append(lab, inp); box.appendChild(wrap);
   }
 }
-function fillCustomFields(extra) {
-  // extra: the flight's saved values, or null for a new flight (use each column's default)
-  for (const el of $('customFields').querySelectorAll('input')) el.value = extra ? (extra[el.dataset.cid] ?? '') : el.dataset.def;
+function fillCustomFields(f) {
+  // f: the flight being edited, or a new-flight stub (no id: fill-in boxes get their defaults)
+  const isNew = !f.id, extra = f.extra || {}, ov = f.override || {};
+  for (const el of $('customFields').querySelectorAll('input')) {
+    if (el.dataset.kind === 'field') el.value = isNew ? el.dataset.def : (extra[el.dataset.key] ?? '');
+    else el.value = ov[el.dataset.key] ?? '';
+    el.classList.toggle('edited', el.dataset.kind === 'ov' && !!el.value.trim());
+  }
+}
+// Keep each edit box's grey placeholder showing the value that will be logged automatically.
+// Values that don't depend on the flight (tail number, model, fixed text) show even before it's complete.
+function refreshAutoValues(f) {
+  const full = csvValues(f, S.cfg), vals = full || { 'Tail Number': S.cfg.anonTail, 'Model': S.cfg.model };
+  for (const el of $('customFields').querySelectorAll('input[data-kind="ov"]')) {
+    const auto = el.dataset.isText ? el.dataset.text : vals[el.dataset.src];
+    el.placeholder = auto != null && auto !== '' ? String(auto) : full ? '(blank)' : 'Auto';
+  }
 }
 function fillForm(f) {
   for (const k of FIELDS) $(k).value = f[k] ?? '';
-  fillCustomFields(f.extra || (f.id ? {} : null));
+  fillCustomFields(f);
   S.duty = f.duty || 'PF'; S.seat = f.seat || S.cfg.seat; setSeg('dutySeg', S.duty); setSeg('seatSeg', S.seat);
   update();
 }
@@ -103,8 +127,12 @@ function update() {
     tc.appendChild(sp);
   } else tc.textContent = `TRIP ${fmtHM(trip)}`;
 
+  refreshAutoValues(f);
   const out = $('calcOut'); out.innerHTML = '';
-  if (!r.ok) { const p = document.createElement('p'); p.className = 'missing'; p.style.margin = '0'; p.textContent = 'Waiting for ' + r.missing.join(', ') + '.'; out.appendChild(p); return r; }
+  if (!r.ok) {
+    const p = document.createElement('p'); p.className = 'missing'; p.style.margin = '0'; p.textContent = 'Waiting for ' + r.missing.join(', ') + '.'; out.appendChild(p);
+    return r;
+  }
   const calc = document.createElement('div'); calc.className = 'calc';
   for (const [v, l] of [[r.total.toFixed(2), `Total · ${S.seat} · XC`], [r.nightMin ? r.night.toFixed(2) : '0', 'Night'], [`${r.distNm}`, 'Distance nm']]) {
     const s = document.createElement('div'); s.className = 'stat'; const b = document.createElement('b'); b.textContent = v; const sp = document.createElement('span'); sp.textContent = l; s.append(b, sp); calc.appendChild(s);
@@ -116,12 +144,6 @@ function update() {
   if (f.flightNumber) chip(fltNo(f.flightNumber));
   if (f.tail) chip(f.tail);
   out.append(calc, chips);
-  const shown = shownValues(f);
-  if (shown.length) {
-    const dl = document.createElement('dl'); dl.className = 'autolist';
-    for (const [k, v] of shown) { const dt = document.createElement('dt'); dt.textContent = k; const dd = document.createElement('dd'); dd.textContent = v || '—'; dl.append(dt, dd); }
-    out.appendChild(dl);
-  }
   return r;
 }
 
@@ -129,6 +151,7 @@ function update() {
 function show(view) {
   for (const v of ['log', 'list', 'night', 'set']) { $('view-' + v).hidden = v !== view; $('tab-' + v).setAttribute('aria-selected', String(v === view)); }
   $('savebar').hidden = view !== 'log';
+  if (view === 'log') update();
   if (view === 'list') renderList();
   if (view === 'night') renderNight();
   if (view === 'set') renderSettings();
@@ -309,7 +332,8 @@ async function refresh() {
   const s = st.settings || {};
   S.cfg = { seat: s.seat || 'PIC', anonTail: s.anon_tail || '#002377', model: s.model || 'B737', airline: s.airline || '', csvNames: s.csv_names || {}, csvOff: s.csv_off || [], csvExtra: s.csv_extra || [], csvShow: s.csv_show || [] };
   S.csvCols = st.csv_columns || CSV_COLS;
-  renderCustomFields(); S.csvSources = st.csv_sources || CSV_SOURCES;
+  renderCustomFields();
+  if (!$('view-log').hidden) update(); S.csvSources = st.csv_sources || CSV_SOURCES;
   statusLine();
   if (!$('view-set').hidden) renderSettings();
   if (!$('view-list').hidden) renderList();
@@ -381,7 +405,7 @@ function renderColumns(force) {
     inp.setAttribute('aria-label', `Header for ${c}`); inp.autocomplete = 'off'; inp.spellcheck = false;
     let vis;
     if (ON_LOG_SCREEN.has(c)) { vis = document.createElement('span'); vis.className = 'onscreen'; vis.textContent = '✓'; vis.title = 'Already on the Log screen'; }
-    else { vis = document.createElement('input'); vis.type = 'checkbox'; vis.className = 'showcb'; vis.checked = show.has(c); vis.dataset.show = c; vis.setAttribute('aria-label', `Show ${c} on the Log screen`); }
+    else { vis = document.createElement('input'); vis.type = 'checkbox'; vis.className = 'showcb'; vis.checked = show.has(c); vis.dataset.show = c; vis.setAttribute('aria-label', `Edit ${c} on the Log screen`); }
     const sync = () => { row.classList.toggle('off', !cb.checked); if (vis.tagName === 'INPUT') vis.disabled = !cb.checked; }; cb.onchange = sync; sync();
     row.append(cb, inp, vis); box.appendChild(row);
   }
@@ -391,6 +415,10 @@ function renderColumns(force) {
 function addExtraRow(x) {
   x = x || { name: '', source: 'field', text: '' };
   const row = document.createElement('div'); row.className = 'extrarow';
+  row.dataset.cid = x.id || 'c' + Math.random().toString(16).slice(2, 10);
+  const showLab = document.createElement('label'); showLab.className = 'x-show';
+  const showCb = document.createElement('input'); showCb.type = 'checkbox'; showCb.checked = (S.cfg.csvShow || []).includes(row.dataset.cid);
+  showLab.append(showCb, document.createTextNode(' Editable on the Log screen'));
   const name = document.createElement('input'); name.type = 'text'; name.className = 'x-name'; name.value = x.name || '';
   name.placeholder = 'Header name'; name.autocomplete = 'off'; name.spellcheck = false; name.setAttribute('aria-label', 'Header name');
   const src = document.createElement('select'); src.className = 'x-src'; src.setAttribute('aria-label', 'Value');
@@ -417,10 +445,6 @@ function addExtraRow(x) {
     text.placeholder = src.value === 'field' ? 'Pre-filled value (optional)' : 'Text, e.g. IFR';
     text.setAttribute('aria-label', src.value === 'field' ? 'Pre-filled value' : 'Text for every flight');
   }; src.onchange = () => { sync(); S.colsDirty = true; }; sync();
-  row.dataset.cid = x.id || 'c' + Math.random().toString(16).slice(2, 10);
-  const showLab = document.createElement('label'); showLab.className = 'x-show';
-  const showCb = document.createElement('input'); showCb.type = 'checkbox'; showCb.checked = (S.cfg.csvShow || []).includes(row.dataset.cid);
-  showLab.append(showCb, document.createTextNode(' Show in Will also log automatically'));
   const tools = document.createElement('div'); tools.className = 'x-tools'; tools.append(up, down, del);
   row.append(name, src, text, showLab, tools); $('csvExtra').appendChild(row);
   syncMoveButtons();

@@ -253,21 +253,22 @@ def csv_layout(cfg):
     same text on every row) or one of CSV_SOURCES. With none set this is
     exactly CSV_COLS.
 
-    Returns (cells, headers): each cell is ('col', key), ('field', id) or
-    ('text', value).
+    Returns (cells, headers): each cell is (kind, value, override_key) with kind
+    'col' (value = a CSV_SOURCES name), 'field' (value = column id) or 'text'.
+    override_key is where a per-flight edit is stored in flight['override'].
     """
     off = set(cfg.get('csv_off') or [])
     names = cfg.get('csv_names') or {}
-    cells = [('col', c) for c in CSV_COLS if c not in off]
-    headers = [(names.get(c) or '').strip() or c for _, c in cells]
+    cells = [('col', c, c) for c in CSV_COLS if c not in off]
+    headers = [(names.get(c) or '').strip() or c for _, c, _ in cells]
     for x in cfg.get('csv_extra') or []:
         src = x.get('source') or 'text'
         if src == 'field':
-            cells.append(('field', x.get('id') or ''))
+            cells.append(('field', x.get('id') or '', None))
         elif src == 'text':
-            cells.append(('text', x.get('text') or ''))
+            cells.append(('text', x.get('text') or '', x.get('id')))
         else:
-            cells.append(('col', src))
+            cells.append(('col', src, x.get('id')))
         headers.append(x['name'])
     return cells, headers
 
@@ -281,7 +282,8 @@ def build_csv(flights, cfg):
     for f in rows:
         row = csv_row(f, cfg)
         if row:
-            extra = f.get('extra') or {}
-            w.writerow([row.get(v, '') if kind == 'col' else extra.get(v, '') if kind == 'field' else v
-                        for kind, v in cells])
+            extra, ov = f.get('extra') or {}, f.get('override') or {}
+            w.writerow([ov[key] if key is not None and key in ov else row.get(v, '') if kind == 'col'
+                        else extra.get(v, '') if kind == 'field' else v
+                        for kind, v, key in cells])
     return buf.getvalue()

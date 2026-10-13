@@ -1,3 +1,8 @@
+## 1.10.0
+- **Settings → CSV columns → Edit** (was Show): ticked columns now get an editable box on the Log screen, pre-filled in grey with the automatic value. Type over it to change that flight's value; clear it to go back to automatic. Works for Night, Landings, PIC/SIC, Total, tail number, model, and your own added columns.
+- Fixed: with any added column, the Settings column list failed to draw.
+- Fixed: the Log screen now picks up settings changes as soon as you switch back to it.
+
 ## 1.9.0
 - The Log screen's summary box is now called **Will also log automatically**.
 - **Settings → CSV columns → Show**: tick any column (standard or added) to see its value in that box while you log. Columns already on the Log screen are marked ✓.

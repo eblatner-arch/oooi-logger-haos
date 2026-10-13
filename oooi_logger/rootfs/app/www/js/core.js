@@ -168,8 +168,9 @@ function csvValues(f, cfg) {
 function csvRow(f, cfg) {
   const row = csvValues(f, cfg);
   if (!row) return null;
-  const extra = f.extra || {};
-  return csvLayout(cfg).cells.map(([kind, v]) => csvCell(kind === 'col' ? (row[v] ?? '') : kind === 'field' ? (extra[v] ?? '') : v)).join(',');
+  const extra = f.extra || {}, ov = f.override || {};
+  return csvLayout(cfg).cells.map(([kind, v, key]) => csvCell(
+    key != null && key in ov ? ov[key] : kind === 'col' ? (row[v] ?? '') : kind === 'field' ? (extra[v] ?? '') : v)).join(',');
 }
 const csvCell = (v) => (/[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v);
 const hrsMs = (ms) => Math.round(Math.round(ms / 60000) / 60 * 100) / 100;
@@ -177,16 +178,16 @@ const dec = (v) => v.toFixed(2).replace(/0$/, '').replace(/\.$/, '');
 // Values a user-added column can copy, besides any standard column.
 const EXTRA_SOURCES = ['Block Time (OUT to IN)', 'Air Time (OFF to ON)', 'Departure', 'Arrival', 'Pilot Duty (PF/PM)'];
 const CSV_SOURCES = CSV_COLS.concat(EXTRA_SOURCES);
-// Standard columns the Log screen already shows as inputs or in its summary.
-const ON_LOG_SCREEN = new Set(['Date', 'Flight Number', 'Route', 'Aircraft Registration', 'Comments', 'Crew Start Time (UTC)', 'Block Out Time', 'Flight Start', 'Flight End', 'Block In Time', 'SIC', 'PIC', 'Total Flight Time', 'Night', 'X-Country']);
+// Standard columns the Log screen already has a box for (everything else can get an Edit box).
+const ON_LOG_SCREEN = new Set(['Date', 'Flight Number', 'Route', 'Aircraft Registration', 'Comments', 'Crew Start Time (UTC)', 'Block Out Time', 'Flight Start', 'Flight End', 'Block In Time']);
 // Columns to write and their header text (cfg.csvOff / csvNames / csvExtra); defaults to CSV_COLS as-is.
 function csvLayout(cfg) {
   const off = new Set(cfg.csvOff || []), names = cfg.csvNames || {};
   const std = CSV_COLS.filter((c) => !off.has(c));
-  const cells = std.map((c) => ['col', c]), headers = std.map((c) => (names[c] || '').trim() || c);
+  const cells = std.map((c) => ['col', c, c]), headers = std.map((c) => (names[c] || '').trim() || c);
   for (const x of cfg.csvExtra || []) {
     const src = x.source || 'text';
-    cells.push(src === 'field' ? ['field', x.id || ''] : src === 'text' ? ['text', x.text || ''] : ['col', src]); headers.push(x.name);
+    cells.push(src === 'field' ? ['field', x.id || '', null] : src === 'text' ? ['text', x.text || '', x.id] : ['col', src, x.id]); headers.push(x.name);
   }
   return { cells, headers };
 }
