@@ -86,12 +86,23 @@ Everything in this part happens in **Google Auth Platform**. Open it from the se
 
    Agree to the policy and click **Create**. You can change these later under **Branding**. Skip the logo, home page and privacy-policy fields.
 
-6. **Data Access** (left sidebar) → **Add or remove scopes**. Tick:
-   - `.../auth/drive.file` — only the Drive files this app creates
-   - `openid`
-   - `.../auth/userinfo.email`
+6. **Data Access** (left sidebar) → **Add or remove scopes**. The add-on needs these three:
 
-   If `drive.file` isn't in the list, paste `https://www.googleapis.com/auth/drive.file` into **Manually add scopes** → **Add to table**. Click **Update**, then **Save** at the bottom of the Data Access page.
+   | Scope (full URL) | Shown in the list as | What it allows |
+   |---|---|---|
+   | `https://www.googleapis.com/auth/drive.file` | `.../auth/drive.file` (Google Drive API) | Create and update only the files this app makes. It can't see anything else in your Drive. |
+   | `openid` | `openid` | Confirm it's you when you sign in. |
+   | `https://www.googleapis.com/auth/userinfo.email` | `.../auth/userinfo.email` | Read your email address, so Settings can show which account is connected. |
+
+   The quickest way: scroll to **Manually add scopes** at the bottom of the panel, paste all three lines below, and click **Add to table**:
+
+   ```
+   https://www.googleapis.com/auth/drive.file
+   openid
+   https://www.googleapis.com/auth/userinfo.email
+   ```
+
+   Check that all three are ticked in the table, click **Update**, then **Save** at the bottom of the Data Access page. They should now appear under **Your non-sensitive scopes**.
 
 7. **Audience** (left sidebar). Under **Publishing status**, click **Publish app** → **Confirm**. It should then read **In production**, with a **Back to testing** button under it, and **User type: External**.
 
