@@ -1,3 +1,6 @@
+## 2.1.3
+- New icon in the same style as FAR 117 Tracker: a logbook clipboard with the airliner, on blue.
+
 ## 2.1.2
 - The "airport code isn't in the airport list" note under Settings → Logbook history is now checked against the current airport list each time, so it no longer lists KPBI (now counted as KDJT) or codes fixed by Update airport database. No need to re-import.
 
