@@ -23,6 +23,23 @@ const fmtHM = (min) => (min == null || isNaN(min) ? '--:--' : `${String(Math.flo
 const todayLocal = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 function toast(t) { const el = $('toast'); el.textContent = t; el.hidden = false; clearTimeout(toast._t); toast._t = setTimeout(() => (el.hidden = true), 3200); }
 const fltNo = (n) => `Flt ${n}`;
+// Times on screen are hours:minutes (3:10) unless Settings → Show hours as is set to decimal.
+// The CSVs always use decimal hours, which is what MyFlightbook imports.
+const fmtMin = (min) => {
+  const m = Math.max(0, Math.round(+min || 0));
+  if (S.cfg.timeFmt === 'dec') return (m / 60).toFixed(2);
+  return `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
+};
+// CSV columns that hold hours (edit boxes show and accept H:MM for these).
+const HOUR_SRC = new Set(['X-Country', 'Night', 'SIC', 'PIC', 'Total Flight Time', 'Block Time (OUT to IN)', 'Air Time (OFF to ON)']);
+const decToMin = (v) => (/^\d*\.?\d+$/.test(String(v).trim()) ? Math.round(parseFloat(v) * 60) : null);
+// "1:16" → "1.27" for the CSV; anything else is kept as typed.
+const toCsvHours = (v) => {
+  const m = /^(\d+):([0-5]?\d)$/.exec(String(v).trim());
+  if (!m) return String(v).trim();
+  return (Math.round(((+m[1] * 60 + +m[2]) / 60) * 100) / 100).toFixed(2).replace(/0$/, '').replace(/\.$/, '');
+};
+const showHours = (v) => { const m = decToMin(v); return m == null ? String(v) : fmtMin(m); };
 function setSeg(segId, v) { for (const b of $(segId).querySelectorAll('button')) b.setAttribute('aria-pressed', String(b.dataset.v === v)); }
 
 function readForm() {
@@ -34,7 +51,7 @@ function readForm() {
   f.extra = {}; f.override = {};
   for (const el of $('customFields').querySelectorAll('input')) {
     const v = el.value.trim(); if (!v) continue;
-    if (el.dataset.kind === 'field') f.extra[el.dataset.key] = v; else f.override[el.dataset.key] = v;
+    if (el.dataset.kind === 'field') f.extra[el.dataset.key] = v; else f.override[el.dataset.key] = HOUR_SRC.has(el.dataset.src) ? toCsvHours(v) : v;
   }
   return f;
 }
@@ -63,7 +80,7 @@ function renderCustomFields() {
     const inp = document.createElement('input'); inp.id = id; inp.autocomplete = 'off';
     inp.dataset.kind = b.kind; inp.dataset.key = b.key;
     if (b.kind === 'field') { inp.dataset.def = b.def; inp.placeholder = b.def ? '' : 'Optional'; }
-    else { inp.className = 'mono'; inp.dataset.src = b.src || b.key; inp.dataset.text = b.text || ''; inp.dataset.isText = b.src === 'text' ? '1' : ''; }
+    else { inp.className = 'mono'; inp.dataset.src = b.src || b.key; if (HOUR_SRC.has(b.src || b.key)) inp.inputMode = 'text'; inp.dataset.text = b.text || ''; inp.dataset.isText = b.src === 'text' ? '1' : ''; }
     const k = b.kind + ':' + b.key;
     inp.value = k in keep ? keep[k] : (b.kind === 'field' && !S.editId ? b.def : '');
     const mark = () => inp.classList.toggle('edited', inp.dataset.kind === 'ov' && !!inp.value.trim());
@@ -76,7 +93,7 @@ function fillCustomFields(f) {
   const isNew = !f.id, extra = f.extra || {}, ov = f.override || {};
   for (const el of $('customFields').querySelectorAll('input')) {
     if (el.dataset.kind === 'field') el.value = isNew ? el.dataset.def : (extra[el.dataset.key] ?? '');
-    else el.value = ov[el.dataset.key] ?? '';
+    else el.value = ov[el.dataset.key] != null ? (HOUR_SRC.has(el.dataset.src) ? showHours(ov[el.dataset.key]) : ov[el.dataset.key]) : '';
     el.classList.toggle('edited', el.dataset.kind === 'ov' && !!el.value.trim());
   }
 }
@@ -86,7 +103,7 @@ function refreshAutoValues(f) {
   const full = csvValues(f, S.cfg), vals = full || { 'Tail Number': S.cfg.anonTail, 'Model': S.cfg.model };
   for (const el of $('customFields').querySelectorAll('input[data-kind="ov"]')) {
     const auto = el.dataset.isText ? el.dataset.text : vals[el.dataset.src];
-    el.placeholder = auto != null && auto !== '' ? String(auto) : full ? '(blank)' : 'Auto';
+    el.placeholder = auto != null && auto !== '' ? (HOUR_SRC.has(el.dataset.src) && !el.dataset.isText ? showHours(auto) : String(auto)) : full ? '(blank)' : 'Auto';
   }
 }
 function fillForm(f) {
@@ -134,7 +151,7 @@ function update() {
     return r;
   }
   const calc = document.createElement('div'); calc.className = 'calc';
-  for (const [v, l] of [[r.total.toFixed(2), `Total · ${S.seat} · XC`], [r.nightMin ? r.night.toFixed(2) : '0', 'Night'], [`${r.distNm}`, 'Distance nm']]) {
+  for (const [v, l] of [[fmtMin(r.totalMin), `Total · ${S.seat} · XC`], [fmtMin(r.nightMin), 'Night'], [`${r.distNm}`, 'Distance nm']]) {
     const s = document.createElement('div'); s.className = 'stat'; const b = document.createElement('b'); b.textContent = v; const sp = document.createElement('span'); sp.textContent = l; s.append(b, sp); calc.appendChild(s);
   }
   const chips = document.createElement('div'); chips.className = 'chips'; chips.style.marginTop = '12px';
@@ -268,9 +285,9 @@ function renderList() {
   const list = $('list'); list.innerHTML = '';
   const fl = S.flights.slice().sort((a, b) => (b.date + (b.out || '')).localeCompare(a.date + (a.out || '')));
   const pending = fl.filter((x) => !x.imported);
-  const sumH = (arr) => arr.reduce((s, x) => { const r = compute(x); return s + (r.ok ? r.total : 0); }, 0);
+  const sumM = (arr) => arr.reduce((s, x) => { const r = compute(x); return s + (r.ok ? r.totalMin : 0); }, 0);
   const sm = $('summary'); sm.innerHTML = '';
-  for (const [v, l] of [[String(pending.length), 'Pending import'], [sumH(pending).toFixed(1), 'Pending hours'], [String(fl.length), 'Flights logged']]) {
+  for (const [v, l] of [[String(pending.length), 'Pending import'], [fmtMin(sumM(pending)), 'Pending hours'], [String(fl.length), 'Flights logged']]) {
     const s = document.createElement('div'); s.className = 'stat'; const b = document.createElement('b'); b.textContent = v; const sp = document.createElement('span'); sp.textContent = l; s.append(b, sp); sm.appendChild(s);
   }
   $('markImported').disabled = !pending.length; $('saveCsv').disabled = !pending.length;
@@ -287,11 +304,11 @@ function renderList() {
     const meta = document.createElement('div'); meta.className = 'meta';
     meta.textContent = `${d.toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' })} · ${f.flightNumber ? fltNo(f.flightNumber) : '—'} · ${f.tail || 'no reg'}`;
     left.append(route, meta);
-    const tm = document.createElement('div'); tm.className = 'time'; tm.textContent = r.ok ? r.total.toFixed(2) : '—';
+    const tm = document.createElement('div'); tm.className = 'time'; tm.textContent = r.ok ? fmtMin(r.totalMin) : '—';
     const chips = document.createElement('div'); chips.className = 'chips';
     const chip = (t, c) => { const s = document.createElement('span'); s.className = 'chip ' + (c || ''); s.textContent = t; chips.appendChild(s); };
     chip(f.duty || 'PF', f.duty === 'PM' ? '' : 'pf');
-    if (r.ok && r.nightMin) chip(`Night ${r.night.toFixed(2)}`, 'night');
+    if (r.ok && r.nightMin) chip(`Night ${fmtMin(r.nightMin)}`, 'night');
     if (r.ok && f.duty === 'PF' && r.nightLdg) chip('Night ldg', 'night');
     chip(f.imported ? 'Imported' : 'Pending', f.imported ? 'ok' : 'pend');
     b.append(left, tm, chips);
@@ -389,7 +406,7 @@ function renderSettings() {
 }
 // Takes effect immediately; it only changes how Stats shows hours, never the CSVs.
 for (const b of $('timeFmtSeg').querySelectorAll('button')) b.onclick = async () => {
-  const v = b.dataset.v; setSeg('timeFmtSeg', v); S.cfg.timeFmt = v; renderHistoryCard();
+  const v = b.dataset.v; setSeg('timeFmtSeg', v); S.cfg.timeFmt = v; renderHistoryCard(); update();
   try { await api('PUT', 'api/settings', { time_fmt: v }); } catch (e) { toast(e.message); }
 };
 $('saveSettings').onclick = async () => {

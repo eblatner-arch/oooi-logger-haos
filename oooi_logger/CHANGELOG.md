@@ -1,3 +1,8 @@
+## 2.2.0
+- Hours:minutes everywhere: the Log screen (total and night), the Flights list (each flight, night chip, pending hours), and the night breakdown now show `3:10` instead of `3.17`.
+- Edit boxes for hour columns show the automatic value as hours:minutes and accept `1:16`; the CSV still gets decimal hours (`1.27`) for MyFlightbook.
+- The setting is now **Settings → Show hours as** and applies to the whole app, not just Stats.
+
 ## 2.1.3
 - New icon in the same style as FAR 117 Tracker: a logbook clipboard with the airliner, on blue.
 

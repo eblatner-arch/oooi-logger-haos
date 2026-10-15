@@ -46,7 +46,7 @@ function renderNight() {
   $('nDate').textContent = new Date(f.date + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
 
   const st = $('nStats'); st.innerHTML = '';
-  for (const [v, l] of [[fmtHM(r.nightMin), `Night · ${r.night.toFixed(2)} hrs`], [fmtHM(r.blockMin), 'Block, OUT→IN'], [`${r.distNm}`, 'Great circle nm']]) {
+  for (const [v, l] of [[fmtMin(r.nightMin), 'Night'], [fmtMin(r.blockMin), 'Block, OUT→IN'], [`${r.distNm}`, 'Great circle nm']]) {
     const d = document.createElement('div'); d.className = 'stat'; const bb = document.createElement('b'); bb.textContent = v; const sp = document.createElement('span'); sp.textContent = l; d.append(bb, sp); st.appendChild(d);
   }
   // night segments
