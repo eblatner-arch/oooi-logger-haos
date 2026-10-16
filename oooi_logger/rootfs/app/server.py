@@ -5,6 +5,8 @@ writes MyFlightbook CSVs to /share/oooi_logger, scans OOOI photos with Gemini,
 and uploads the files to Google Drive using a device sign-in (refresh token).
 """
 import base64
+import gzip
+import re
 import hashlib
 import hmac
 import json
@@ -537,6 +539,61 @@ def auth_token(password):
     return hmac.new(_secret(), password.encode('utf-8'), hashlib.sha256).hexdigest()
 
 
+# ---------------- Fast loading ----------------
+# Static files are read once and kept in memory (re-read when they change on disk). Each gets an
+# ETag from its content. index.html links every script and stylesheet with ?v=<that tag>, so the
+# browser can keep those files for a year and only fetches index.html (or a 304) on each open.
+_FILES = {}
+_COMPRESSIBLE = ('text/', 'application/javascript', 'application/json', 'image/svg+xml', 'application/manifest+json')
+
+
+def static_file(full):
+    st = os.stat(full)
+    hit = _FILES.get(full)
+    if hit and hit['mtime'] == st.st_mtime and hit['size'] == st.st_size:
+        return hit
+    with open(full, 'rb') as fh:
+        body = fh.read()
+    ctype = mimetypes.guess_type(full)[0] or 'application/octet-stream'
+    if full.endswith('.webmanifest'):
+        ctype = 'application/manifest+json'
+    if full.endswith('.js'):
+        ctype = 'application/javascript'
+    hit = {'mtime': st.st_mtime, 'size': st.st_size, 'body': body, 'ctype': ctype, 'gz': None,
+           'etag': '"' + hashlib.sha1(body).hexdigest()[:16] + '"'}
+    _FILES[full] = hit
+    return hit
+
+
+def asset_path(rel):
+    """Disk path for a web file (the airport list downloaded to /data replaces the bundled one)."""
+    if rel == 'js/airports.js' and os.path.isfile(_path('airports.js')) and load('airports_meta.json', {}).get('updated'):
+        return _path('airports.js')
+    full = os.path.normpath(os.path.join(WWW, rel))
+    return full if full.startswith(WWW) and os.path.isfile(full) else None
+
+
+_ASSET_REF = re.compile(r'((?:js|css|icons)/[\w.-]+\.(?:js|css|png|svg))(?=["\'])')
+
+
+def versioned_page(rel):
+    """index.html / login.html with ?v=<content tag> added to every local script, stylesheet and icon."""
+    page = static_file(os.path.join(WWW, rel))
+    tags = []
+
+    def add(m):
+        full = asset_path(m.group(1))
+        if not full:
+            return m.group(1)
+        tag = static_file(full)['etag'].strip('"')[:10]
+        tags.append(tag)
+        return f'{m.group(1)}?v={tag}'
+    text = _ASSET_REF.sub(add, page['body'].decode('utf-8'))
+    body = text.encode('utf-8')
+    return {'body': body, 'ctype': 'text/html; charset=utf-8', 'gz': None,
+            'etag': '"' + hashlib.sha1(body).hexdigest()[:16] + '"'}
+
+
 OPEN_PATHS = {'/login.html', '/css/app.css', '/manifest.webmanifest', '/api/login'}
 
 
@@ -570,25 +627,44 @@ class Handler(BaseHTTPRequestHandler):
             self.send_error(401)
         return False
 
-    def _static(self, rel):
-        full = os.path.normpath(os.path.join(WWW, rel))
-        with open(full, 'rb') as fh:
-            body = fh.read()
-        self.send_response(200)
-        self.send_header('Content-Type', mimetypes.guess_type(full)[0] or 'application/octet-stream')
-        self.send_header('Content-Length', str(len(body)))
-        self.send_header('Cache-Control', 'no-cache')
-        self.end_headers()
-        self.wfile.write(body)
-
-    def _json(self, code, obj):
-        body = json.dumps(obj).encode()
+    def _send(self, code, body, ctype, cache='no-cache', etag=None, entry=None):
+        """Send a response: 304 when the browser already has it, gzip when it helps."""
+        if etag and code == 200 and etag in [t.strip() for t in (self.headers.get('If-None-Match') or '').split(',')]:
+            self.send_response(304)
+            self.send_header('ETag', etag)
+            self.send_header('Cache-Control', cache)
+            self.end_headers()
+            return
+        gz = None
+        # Compress on the direct port. Through ingress, Home Assistant's proxy handles the connection to the phone.
+        if self.DIRECT and len(body) > 1024 and ctype.startswith(_COMPRESSIBLE) and 'gzip' in (self.headers.get('Accept-Encoding') or ''):
+            if entry is not None:
+                if entry.get('gz') is None:
+                    entry['gz'] = gzip.compress(body, 6)
+                gz = entry['gz']
+            else:
+                gz = gzip.compress(body, 6)
+        out = gz or body
         self.send_response(code)
-        self.send_header('Content-Type', 'application/json')
-        self.send_header('Content-Length', str(len(body)))
-        self.send_header('Cache-Control', 'no-store')
+        self.send_header('Content-Type', ctype)
+        self.send_header('Content-Length', str(len(out)))
+        self.send_header('Cache-Control', cache)
+        self.send_header('Vary', 'Accept-Encoding')
+        if etag:
+            self.send_header('ETag', etag)
+        if gz:
+            self.send_header('Content-Encoding', 'gzip')
         self.end_headers()
-        self.wfile.write(body)
+        if self.command != 'HEAD':
+            self.wfile.write(out)
+
+    def _static(self, rel):
+        page = versioned_page(rel)
+        self._send(200, page['body'], page['ctype'], 'no-cache', page['etag'], page)
+
+    def _json(self, code, obj, etag=None):
+        body = json.dumps(obj).encode()
+        self._send(code, body, 'application/json', 'no-cache' if etag else 'no-store', etag)
 
     def _body(self):
         n = int(self.headers.get('Content-Length') or 0)
@@ -608,8 +684,9 @@ class Handler(BaseHTTPRequestHandler):
         if p == '/api/history':
             h = load('history.json', None) or {'entries': []}
             entries, unknown, n = hist.resolve(h.get('entries') or [])
+            ver = f"{h.get('imported_at')}|{len(fm.AP)}|{load('airports_meta.json', {}).get('updated')}"
             return self._json(200, {**h, 'entries': entries, 'unknown_airports': unknown, 'unknown_airport_count': n,
-                                    'version': f"{h.get('imported_at')}|{len(fm.AP)}"})
+                                    'version': ver}, etag='"h' + hashlib.sha1(ver.encode()).hexdigest()[:15] + '"')
         if p == '/api/csv/pending':
             with LOCK:
                 csv_text = fm.build_csv([f for f in flights() if not f.get('imported')], settings())
@@ -623,20 +700,16 @@ class Handler(BaseHTTPRequestHandler):
             return
         # static files (an updated airport list in /data replaces the bundled one)
         rel = 'index.html' if p == '/' else p.lstrip('/')
-        full = os.path.normpath(os.path.join(WWW, rel))
-        if rel == 'js/airports.js' and os.path.isfile(_path('airports.js')) and load('airports_meta.json', {}).get('updated'):
-            full = _path('airports.js')
-        elif not full.startswith(WWW) or not os.path.isfile(full):
+        if rel in ('index.html', 'login.html'):
+            return self._static(rel)
+        full = asset_path(rel)
+        if not full:
             self.send_error(404)
             return
-        with open(full, 'rb') as fh:
-            body = fh.read()
-        self.send_response(200)
-        self.send_header('Content-Type', mimetypes.guess_type(full)[0] or 'application/octet-stream')
-        self.send_header('Content-Length', str(len(body)))
-        self.send_header('Cache-Control', 'no-cache')
-        self.end_headers()
-        self.wfile.write(body)
+        f = static_file(full)
+        # A ?v= link names this exact content, so the browser can keep it; otherwise it checks each time.
+        versioned = 'v=' in urllib.parse.urlparse(self.path).query
+        self._send(200, f['body'], f['ctype'], 'public, max-age=31536000, immutable' if versioned else 'no-cache', f['etag'], f)
 
     def do_PUT(self):
         if not self._guard():

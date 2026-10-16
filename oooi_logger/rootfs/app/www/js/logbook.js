@@ -322,7 +322,8 @@ function drawMapTab() {
   svg.setAttribute('viewBox', `${v.x} ${v.y} ${v.w} ${v.h}`);
   const k = v.k;
   const defs = svgEl('defs', {});
-  defs.appendChild(svgEl('path', { id: 'wLand', d: LAND_D }));
+  if (typeof LAND_D === 'undefined') window.loadLand().then(() => { if (!$('view-map').hidden) drawMapTab(); }).catch(() => {});
+  defs.appendChild(svgEl('path', { id: 'wLand', d: typeof LAND_D === 'undefined' ? '' : LAND_D }));
   svg.appendChild(defs);
   const g = svgEl('g', { transform: `scale(${k} 1)`, fill: 'var(--land)', stroke: 'var(--coast)', 'stroke-width': 0.8 });
   for (const o of WRAP) g.appendChild(svgEl('use', { href: '#wLand', x: o, 'vector-effect': 'non-scaling-stroke' }));

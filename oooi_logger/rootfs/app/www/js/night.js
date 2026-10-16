@@ -117,7 +117,8 @@ function drawMap(smp, a, b, f, t) {
   svg.setAttribute('viewBox', `${leftX} ${top} ${w} ${h}`);
   svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
   const g = el('g', { transform: `scale(${k} 1)` });
-  g.appendChild(el('path', { d: LAND_D, fill: 'var(--land)', stroke: 'var(--coast)', 'stroke-width': 0.8, 'vector-effect': 'non-scaling-stroke' }));
+  if (typeof LAND_D === 'undefined') window.loadLand().then(() => { if (!$('view-night').hidden) renderNight(); }).catch(() => {});
+  g.appendChild(el('path', { d: typeof LAND_D === 'undefined' ? '' : LAND_D, fill: 'var(--land)', stroke: 'var(--coast)', 'stroke-width': 0.8, 'vector-effect': 'non-scaling-stroke' }));
   // graticule every 5°
   for (let lon = Math.ceil((leftX / k) / 5) * 5; lon < (leftX + w) / k; lon += 5) g.appendChild(el('line', { x1: lon, x2: lon, y1: top, y2: top + h, stroke: 'var(--coast)', 'stroke-width': 0.5, 'stroke-dasharray': '2 4', 'vector-effect': 'non-scaling-stroke', opacity: 0.6 }));
   for (let lat = Math.ceil(-(top + h) / 5) * 5; lat < -top; lat += 5) g.appendChild(el('line', { x1: leftX / k, x2: (leftX + w) / k, y1: -lat, y2: -lat, stroke: 'var(--coast)', 'stroke-width': 0.5, 'stroke-dasharray': '2 4', 'vector-effect': 'non-scaling-stroke', opacity: 0.6 }));

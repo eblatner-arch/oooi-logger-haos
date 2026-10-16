@@ -1,3 +1,11 @@
+## 2.4.0
+- Faster loading on slow connections. On a weak cell signal the app is usable in about 2 seconds the first time and under 1 second after that (it was about 4.5 seconds every time), and opening it again downloads about 30 KB instead of about 860 KB.
+  - Scripts and styles are cached on the phone until an update changes them.
+  - The Home Screen app (direct port) sends everything compressed. Your imported history shrinks about tenfold, and Stats skips downloading it again when it hasn't changed.
+  - The world-map outlines load only when you open Map or the night breakdown (or in the background a few seconds after opening).
+  - The page no longer waits for Google Fonts before it appears.
+- If anything looks wrong after updating, the previous release is kept on the `restore-2.3.0` branch.
+
 ## 2.3.0
 - **Stats → Search**, laid out like Flight Tracker's History search: a search box (flight, airport, tail, type, month, weekday, night, or `>5` for time), quick chips (night time, night landing, PF, PM, PIC, SIC, logged here, from MyFlightbook), More filters (year, month, from, to, either airport, route one way or both, aircraft, registration, day, time range, since, sort), a running total of what matches, and results by month.
 - Top routes now read **KEWR ⇄ KFLL** with the split by direction underneath (for example 29 KEWR→KFLL · 29 KFLL→KEWR), since the count covers both ways.
