@@ -34,7 +34,7 @@ function appEntries() {
     const ov = f.override || {}, get = (k) => (k in ov ? ov[k] : vals[k]), n = (k) => +get(k) || 0;
     out.push({ d: f.date, r: [apCode(f.from), apCode(f.to)], t: n('Total Flight Time'), pic: n('PIC'), sic: n('SIC'), n: n('Night'), x: n('X-Country'),
       l: n('Landings'), ld: n('FS Day Landings'), ln: n('FS Night Landings'), to: n('Takeoffs (any)'), ton: n('Takeoffs - Night'),
-      reg: f.tail || '', m: S.cfg.model, fn: f.flightNumber || '', src: 'app' });
+      reg: f.tail || '', m: S.cfg.model, fn: f.flightNumber || '', src: 'app', id: f.id, duty: f.duty || 'PF' });
   }
   return out;
 }
@@ -181,12 +181,15 @@ function topList(box, rows, empty) {
   box.innerHTML = '';
   if (!rows.length) { const p = document.createElement('p'); p.className = 'small'; p.style.margin = '0'; p.textContent = empty; box.appendChild(p); return; }
   const max = rows[0][1];
-  for (const [name, n, sub] of rows) {
-    const row = document.createElement('div'); row.className = 'toprow';
+  for (const [name, n, sub, note, go] of rows) {
+    const row = document.createElement('div'); row.className = 'toprow' + (go ? ' link' : '');
     const a = document.createElement('span'); a.className = 'mono'; a.textContent = name;
     const meter = document.createElement('span'); meter.className = 'meter'; const fill = document.createElement('i'); fill.style.width = `${Math.max(4, (n / max) * 100)}%`; meter.appendChild(fill);
     const v = document.createElement('span'); v.className = 'num'; v.textContent = sub;
-    row.append(a, meter, v); box.appendChild(row);
+    row.append(a, meter, v);
+    if (note) { const d = document.createElement('span'); d.className = 'dir'; d.textContent = note; row.appendChild(d); }
+    if (go) { row.tabIndex = 0; row.setAttribute('role', 'link'); row.onclick = go; row.onkeydown = (e) => { if (e.key === 'Enter') go(); }; }
+    box.appendChild(row);
   }
 }
 
@@ -196,6 +199,7 @@ async function renderStats() {
   $('statsEmpty').hidden = !!all.length; $('statsBody').hidden = !all.length;
   $('statsImportHint').hidden = !!LB.histKey;
   if (!all.length) return;
+  setStatsView(LB.statsView || 'overview');
   fillPeriodSelect($('statPeriod'), all);
   const es = inPeriod(all, LB.period), t = totals(es);
   const nApp = es.filter((e) => e.src === 'app').length;
@@ -203,10 +207,12 @@ async function renderStats() {
   renderCurrency($('curBox'), all);
 
   const tiles = $('statTiles'); tiles.innerHTML = '';
-  for (const [v, l] of [[fmtH(t.total), 'Total hours'], [fmtH(t.pic), 'PIC'], [fmtH(t.sic), 'SIC'],
-    [fmtH(t.night), 'Night'], [fmtH(t.xc), 'Cross-country'], [fmtNum(t.flights), 'Flights'],
-    [fmtNum(t.l), `Landings · ${fmtNum(t.ln)} night`], [fmtNum(t.airports), 'Airports'], [fmtNum(t.nm), 'Distance nm']]) {
-    const s = document.createElement('div'); s.className = 'stat'; const b = document.createElement('b'); b.textContent = v; const sp = document.createElement('span'); sp.textContent = l; s.append(b, sp); tiles.appendChild(s);
+  for (const [v, l, st] of [[fmtH(t.total), 'Total hours', []], [fmtH(t.pic), 'PIC', ['pic']], [fmtH(t.sic), 'SIC', ['sic']],
+    [fmtH(t.night), 'Night', ['night']], [fmtH(t.xc), 'Cross-country', null], [fmtNum(t.flights), 'Flights', []],
+    [fmtNum(t.l), `Landings · ${fmtNum(t.ln)} night`, ['ldg']], [fmtNum(t.airports), 'Airports', null], [fmtNum(t.nm), 'Distance nm', null]]) {
+    const s = document.createElement('div'); s.className = 'stat' + (st ? ' link' : ''); const b = document.createElement('b'); b.textContent = v; const sp = document.createElement('span'); sp.textContent = l; s.append(b, sp);
+    if (st) { s.tabIndex = 0; s.setAttribute('role', 'link'); s.onclick = () => openFind({ st }); }
+    tiles.appendChild(s);
   }
   if (t.sims) { const s = $('statSims'); s.hidden = false; s.textContent = `Plus ${t.sims} simulator session${t.sims === 1 ? '' : 's'} (not counted as flights).`; } else $('statSims').hidden = true;
 
@@ -228,13 +234,21 @@ async function renderStats() {
   const pairs = new Map(), aps = new Map(), types = new Map();
   for (const e of es) {
     if (e.sim) continue;
-    for (const [a, b] of legs(e)) { const k = [a, b].sort().join(' – '); const p = pairs.get(k) || { n: 0, h: 0 }; p.n++; p.h += e.t / Math.max(1, legs(e).length); pairs.set(k, p); }
+    for (const [a, b] of legs(e)) {
+      const [x, y] = [a, b].sort(), k = `${x}|${y}`, p = pairs.get(k) || { n: 0, h: 0, fwd: 0 };
+      p.n++; if (a === x) p.fwd++; p.h += e.t / Math.max(1, legs(e).length); pairs.set(k, p);
+    }
     for (const a of new Set(e.r)) aps.set(a, (aps.get(a) || 0) + 1);
     if (e.m) { const k = e.m; types.set(k, (types.get(k) || 0) + e.t); }
   }
-  topList($('topRoutes'), [...pairs].sort((a, b) => b[1].n - a[1].n).slice(0, 8).map(([k, p]) => [k, p.n, `${p.n}× · ${fmtHu(p.h)}`]), 'No routes in this period.');
-  topList($('topAirports'), [...aps].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([k, n]) => [k, n, `${fmtNum(n)} visit${n === 1 ? '' : 's'}`]), 'No airports in this period.');
-  topList($('topTypes'), [...types].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([k, h]) => [k, h, `${fmtHu(h)}`]), 'No aircraft in this period.');
+  const pf = periodFilter();
+  // A route counts flights both ways: KEWR ⇄ KFLL is KEWR→KFLL plus KFLL→KEWR.
+  topList($('topRoutes'), [...pairs].sort((a, b) => b[1].n - a[1].n).slice(0, 8).map(([k, p]) => {
+    const [x, y] = k.split('|');
+    return [`${x} ⇄ ${y}`, p.n, `${fmtNum(p.n)}× · ${fmtHu(p.h)}`, `${fmtNum(p.fwd)} ${x}→${y} · ${fmtNum(p.n - p.fwd)} ${y}→${x}`, () => openFind({ f: { ...pf, route: `${x}-${y}`, both: '1' } })];
+  }), 'No routes in this period.');
+  topList($('topAirports'), [...aps].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([k, n]) => [k, n, `${fmtNum(n)} visit${n === 1 ? '' : 's'}`, '', () => openFind({ f: { ...pf, ap: k } })]), 'No airports in this period.');
+  topList($('topTypes'), [...types].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([k, h]) => [k, h, `${fmtHu(h)}`, '', () => openFind({ f: { ...pf, ac: k } })]), 'No aircraft in this period.');
 
   // records
   const rec = $('records'); rec.innerHTML = '';
@@ -409,6 +423,191 @@ function setupMapGestures() {
   $('mapFit').onclick = () => { LB.view = fitView(LB.mapData.aps); drawMapTab(); };
 }
 
+// ---------- Stats → Search ----------
+// Same screen as Flight Tracker's History search: a search box, quick chips, More filters,
+// a summary line and month-grouped results. Everything is filtered here in the page.
+const FIND = { q: '', st: new Set(), f: {}, sort: 'new' };
+const FDOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const FMON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const FCHIPS = [['night', 'Night time'], ['nldg', 'Night landing'], ['ldg', 'Landed (PF)'], ['noldg', 'No landing (PM)'],
+  ['pic', 'PIC'], ['sic', 'SIC'], ['app', 'Logged here'], ['mfb', 'From MyFlightbook']];
+const FSORT = [['new', 'Newest'], ['old', 'Oldest'], ['long', 'Longest time'], ['night', 'Most night'], ['dist', 'Longest distance']];
+
+// The Stats period as search filters, so a tap on a top route searches the same period.
+function periodFilter() {
+  const p = LB.period;
+  if (/^\d{4}$/.test(p)) return { year: p };
+  if (p === '12m' || p === '90d') return { since: addDays(todayIso(), p === '12m' ? -364 : -89) };
+  return {};
+}
+// An airport box matches ICAO or a 3-letter US code (FLL finds KFLL), and a partly typed code.
+const apIs = (code, v) => { if (!code || !v) return false; v = v.toUpperCase(); return code.startsWith(v) || (v.length <= 3 && /^K/.test(code) && code.slice(1).startsWith(v)); };
+const eDow = (e) => new Date(e.d + 'T12:00:00Z').getUTCDay();
+const parseHrs = (v) => { v = String(v || '').trim(); const m = /^(\d+):([0-5]?\d)$/.exec(v); if (m) return +m[1] + +m[2] / 60; return v === '' || isNaN(+v) ? null : +v; };
+function eHay(e) {
+  if (e._hay) return e._hay;
+  const codes = e.r.flatMap((c) => (/^K[A-Z]{3}$/.test(c) ? [c, c.slice(1)] : [c]));
+  const lg = legs(e).flatMap(([a, b]) => { const s3 = (c) => (/^K[A-Z]{3}$/.test(c) ? c.slice(1) : c); return [`${a}-${b}`, `${a}${b}`, `${s3(a)}-${s3(b)}`, `${s3(a)}${s3(b)}`]; });
+  const mo = +e.d.slice(5, 7) - 1;
+  return (e._hay = [...codes, ...lg, e.fn, e.fn && `flt${e.fn}`, e.reg, e.m, e.d, e.d.slice(0, 4), FMON[mo], fmtDate(e.d, { month: 'long' }), FDOW[eDow(e)],
+    e.n > 0 && 'night', e.ln > 0 && 'nightlanding', e.pic > 0 && 'pic', e.sic > 0 && 'sic', e.sim && 'sim simulator',
+    e.src === 'app' ? 'logged here' : 'myflightbook mfb', e.duty && e.duty.toLowerCase()].filter(Boolean).join(' ').toLowerCase());
+}
+function fChip(e, k) {
+  switch (k) {
+    case 'night': return e.n > 0;
+    case 'nldg': return e.ln > 0;
+    case 'ldg': return e.l > 0;
+    case 'noldg': return !e.l && !e.sim;
+    case 'pic': return e.pic > 0;
+    case 'sic': return e.sic > 0;
+    case 'app': return e.src === 'app';
+    case 'mfb': return e.src !== 'app';
+  }
+  return true;
+}
+function applyFind(all) {
+  const f = FIND.f, g = (k) => String(f[k] || '').trim();
+  const toks = FIND.q.toLowerCase().split(/\s+/).filter(Boolean);
+  let [rd, ra] = g('route').toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim().split(' ');
+  const minH = parseHrs(g('min')), maxH = parseHrs(g('max'));
+  const out = all.filter((e) => {
+    if (g('year') && !e.d.startsWith(g('year'))) return false;
+    if (g('since') && e.d < g('since')) return false;
+    if (g('mo') && +e.d.slice(5, 7) !== +g('mo')) return false;
+    if (g('dow') !== '' && String(eDow(e)) !== g('dow')) return false;
+    const first = e.r[0], last = e.r[e.r.length - 1];
+    if (g('dep') && !apIs(first, g('dep'))) return false;
+    if (g('arr') && !apIs(last, g('arr'))) return false;
+    if (g('ap') && !e.r.some((c) => apIs(c, g('ap')))) return false;
+    if (rd) {
+      const lg = legs(e);
+      const hit = (a, b) => lg.some(([x, y]) => apIs(x, a) && (!b || apIs(y, b)));
+      if (!hit(rd, ra) && !(g('both') && ra && hit(ra, rd))) return false;
+    }
+    if (g('tail') && !(e.reg || '').toUpperCase().includes(g('tail').toUpperCase())) return false;
+    if (g('ac') && (e.m || '') !== g('ac')) return false;
+    for (const k of FIND.st) if (!fChip(e, k)) return false;
+    if (minH != null && !(e.t >= minH - 1e-9)) return false;
+    if (maxH != null && !(e.t <= maxH + 1e-9)) return false;
+    for (const t of toks) {
+      const m = /^([<>]=?)(\d+(?::[0-5]?\d|\.\d+)?)$/.exec(t);   // >4 or >=3:30 = total time
+      if (m) { const n = parseHrs(m[2]); if (!(m[1][0] === '>' ? e.t >= n : e.t <= n)) return false; }
+      else if (!eHay(e).includes(t)) return false;
+    }
+    return true;
+  });
+  const by = { new: (a, b) => (b.d > a.d ? 1 : b.d < a.d ? -1 : 0), old: (a, b) => (a.d > b.d ? 1 : a.d < b.d ? -1 : 0),
+    long: (a, b) => b.t - a.t, night: (a, b) => b.n - a.n, dist: (a, b) => entryNm(b) - entryNm(a) }[FIND.sort] || ((a, b) => 0);
+  return out.sort(by);
+}
+function findRow(e) {
+  const b = document.createElement(e.src === 'app' ? 'button' : 'div');
+  b.className = 'flight' + (e.src === 'app' ? '' : ' hist');
+  if (e.src === 'app') { b.type = 'button'; b.onclick = () => editFlight(e.id); }
+  const left = document.createElement('div');
+  const route = document.createElement('div'); route.className = 'route'; route.textContent = e.r.join('–') || '—';
+  const meta = document.createElement('div'); meta.className = 'meta';
+  meta.textContent = [fmtDate(e.d, { weekday: 'short', month: 'short', day: 'numeric' }), e.fn && fltNo(e.fn), e.reg, e.m].filter(Boolean).join(' · ');
+  left.append(route, meta);
+  const tm = document.createElement('div'); tm.className = 'time'; tm.textContent = fmtH(e.t);
+  const chips = document.createElement('div'); chips.className = 'chips';
+  const chip = (t, c) => { const s = document.createElement('span'); s.className = 'chip ' + (c || ''); s.textContent = t; chips.appendChild(s); };
+  if (e.sim) chip('Sim');
+  else if (e.duty) chip(e.duty, e.duty === 'PF' ? 'pf' : '');
+  else if (e.l) chip(`${e.l} ldg`);
+  if (e.n > 0) chip(`Night ${fmtH(e.n)}`, 'night');
+  if (e.ln > 0) chip('Night ldg', 'night');
+  chip(e.src === 'app' ? 'Logged here' : 'MyFlightbook');
+  b.append(left, tm, chips);
+  return b;
+}
+function nFilters() { return Object.keys(FIND.f).filter((k) => FIND.f[k] !== '' && FIND.f[k] != null).length + (FIND.sort !== 'new' ? 1 : 0); }
+function drawFind() {
+  const all = allEntries(), res = applyFind(all);
+  const t = res.reduce((a, e) => { a.t += e.t; a.n += e.n; a.l += e.l; a.nm += entryNm(e); return a; }, { t: 0, n: 0, l: 0, nm: 0 });
+  const sum = $('fSum'); sum.innerHTML = '';
+  const b = document.createElement('b'); b.textContent = fmtNum(res.length);
+  sum.append(b, ` flight${res.length === 1 ? '' : 's'} · ${fmtHu(t.t)} total · ${fmtH(t.n)} night · ${fmtNum(t.l)} ldg · ${fmtNum(t.nm)} nm`);
+  $('fMoreLabel').textContent = `More filters${nFilters() ? ` · ${nFilters()}` : ''}`;
+  const out = $('fOut'); out.innerHTML = '';
+  if (!res.length) { const c = document.createElement('div'); c.className = 'card empty'; c.textContent = 'No flights match.'; out.appendChild(c); return; }
+  const shown = res.slice(0, 500);
+  if (FIND.sort === 'new' || FIND.sort === 'old') {
+    let month = '', list = null;
+    for (const e of shown) {
+      const m = e.d.slice(0, 7);
+      if (m !== month) { month = m; const h = document.createElement('div'); h.className = 'month'; h.textContent = fmtDate(m + '-15', { month: 'long', year: 'numeric' }); out.appendChild(h); list = document.createElement('div'); list.className = 'list'; out.appendChild(list); }
+      list.appendChild(findRow(e));
+    }
+  } else { const list = document.createElement('div'); list.className = 'list'; for (const e of shown) list.appendChild(findRow(e)); out.appendChild(list); }
+  if (res.length > shown.length) { const p = document.createElement('p'); p.className = 'small'; p.style.margin = '0'; p.textContent = `Showing the first ${shown.length}. Narrow the search to see the rest.`; out.appendChild(p); }
+}
+function buildFind() {
+  const all = allEntries();
+  $('fq').value = FIND.q;
+  const chips = $('fChips'); chips.innerHTML = '';
+  for (const [k, l] of FCHIPS) {
+    const c = document.createElement('button'); c.type = 'button'; c.className = 'ychip' + (FIND.st.has(k) ? ' on' : ''); c.textContent = l;
+    c.onclick = () => { FIND.st.has(k) ? FIND.st.delete(k) : FIND.st.add(k); c.classList.toggle('on', FIND.st.has(k)); drawFind(); };
+    chips.appendChild(c);
+  }
+  const uniq = (fn) => [...new Set(all.map(fn).filter(Boolean))].sort();
+  const fill = (id, vals) => { const dl = $(id); dl.innerHTML = ''; for (const v of vals) { const o = document.createElement('option'); o.value = v; dl.appendChild(o); } };
+  fill('dlAp', [...new Set(all.flatMap((e) => e.r))].sort());
+  fill('dlRt', [...new Set(all.flatMap((e) => legs(e).map(([a, b]) => `${a}-${b}`)))].sort());
+  fill('dlTail', uniq((e) => e.reg));
+  const grid = $('fGrid'); grid.innerHTML = '';
+  const field = (label, el, wide) => { const w = document.createElement('label'); w.className = 'ff' + (wide ? ' wide' : ''); const s = document.createElement('span'); s.textContent = label; w.append(s, el); grid.appendChild(w); return el; };
+  const sel = (k, label, opts) => {
+    const el = document.createElement('select'); el.id = 'ff_' + k;
+    for (const [v, t] of [['', 'Any'], ...opts]) { const o = document.createElement('option'); o.value = v; o.textContent = t; el.appendChild(o); }
+    el.value = FIND.f[k] || ''; el.onchange = () => { FIND.f[k] = el.value; drawFind(); }; return field(label, el);
+  };
+  let tt = null;
+  const txt = (k, label, ph, list, wide) => {
+    const el = document.createElement('input'); el.id = 'ff_' + k; el.placeholder = ph; el.autocomplete = 'off'; el.spellcheck = false; el.setAttribute('autocapitalize', 'characters');
+    if (list) el.setAttribute('list', list);
+    el.value = FIND.f[k] || ''; el.oninput = () => { clearTimeout(tt); tt = setTimeout(() => { FIND.f[k] = el.value.trim(); drawFind(); }, 200); };
+    return field(label, el, wide);
+  };
+  sel('year', 'Year', uniq((e) => e.d.slice(0, 4)).reverse().map((y) => [y, y]));
+  sel('mo', 'Month', FMON.map((m, i) => [String(i + 1), m]));
+  txt('dep', 'From', 'EWR', 'dlAp');
+  txt('arr', 'To', 'FLL', 'dlAp');
+  txt('ap', 'Either airport', 'MCO', 'dlAp');
+  txt('route', 'Route', 'EWR-FLL', 'dlRt');
+  sel('both', 'Direction', [['1', 'Both ways']]).options[0].textContent = 'As typed';
+  sel('ac', 'Aircraft type', uniq((e) => e.m).map((m) => [m, m]));
+  txt('tail', 'Registration', 'N37560', 'dlTail');
+  sel('dow', 'Day', FDOW.map((d, i) => [String(i), d]));
+  txt('min', 'At least', '3:00');
+  txt('max', 'At most', '1:30');
+  const since = document.createElement('input'); since.type = 'date'; since.id = 'ff_since'; since.value = FIND.f.since || '';
+  since.onchange = () => { FIND.f.since = since.value; drawFind(); };
+  field('Since', since);
+  const sort = document.createElement('select'); sort.id = 'ff_sort';
+  for (const [v, t] of FSORT) { const o = document.createElement('option'); o.value = v; o.textContent = t; sort.appendChild(o); }
+  sort.value = FIND.sort; sort.onchange = () => { FIND.sort = sort.value; drawFind(); };
+  field('Sort', sort);
+  const clr = document.createElement('button'); clr.type = 'button'; clr.className = 'btn'; clr.textContent = 'Clear all';
+  clr.onclick = () => { FIND.q = ''; FIND.st.clear(); FIND.f = {}; FIND.sort = 'new'; buildFind(); drawFind(); };
+  const w = document.createElement('div'); w.className = 'ff wide'; w.appendChild(clr); grid.appendChild(w);
+  $('fMore').open = nFilters() > 0;
+  drawFind();
+}
+function setStatsView(v) {
+  LB.statsView = v;
+  setSeg('statsSeg', v);
+  $('statsOverview').hidden = v !== 'overview'; $('statsSearch').hidden = v !== 'search';
+  if (v === 'search') buildFind();
+}
+// Open Search with these filters (from a tap on a top route, airport, aircraft or tile).
+function openFind({ st, f } = {}) {
+  FIND.q = ''; FIND.st = new Set(st || []); FIND.f = { ...periodFilter(), ...(f || {}) }; FIND.sort = 'new';
+  setStatsView('search'); window.scrollTo(0, 0);
+}
+
 // ---------- Settings: import ----------
 function renderHistoryCard() {
   const h = S.historyInfo, info = $('histInfo');
@@ -444,4 +643,7 @@ function setupHistoryCard() {
   for (const id of ['statPeriod', 'mapPeriod']) $(id).addEventListener('change', (e) => { LB.period = e.target.value; if (id === 'statPeriod') renderStats(); else { LB.sel = null; renderMap(); } });
   for (const id of ['statsGoImport', 'mapGoImport', 'statsGoImport2', 'mapGoImport2']) if ($(id)) $(id).onclick = () => show('set');
   setupMapGestures();
+  for (const b of $('statsSeg').querySelectorAll('button')) b.onclick = () => setStatsView(b.dataset.v);
+  let qt = null;
+  $('fq').addEventListener('input', (e) => { clearTimeout(qt); qt = setTimeout(() => { FIND.q = e.target.value.trim(); drawFind(); }, 150); });
 }

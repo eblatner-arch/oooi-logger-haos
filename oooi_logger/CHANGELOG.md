@@ -1,3 +1,8 @@
+## 2.3.0
+- **Stats → Search**, laid out like Flight Tracker's History search: a search box (flight, airport, tail, type, month, weekday, night, or `>5` for time), quick chips (night time, night landing, PF, PM, PIC, SIC, logged here, from MyFlightbook), More filters (year, month, from, to, either airport, route one way or both, aircraft, registration, day, time range, since, sort), a running total of what matches, and results by month.
+- Top routes now read **KEWR ⇄ KFLL** with the split by direction underneath (for example 29 KEWR→KFLL · 29 KFLL→KEWR), since the count covers both ways.
+- Top routes, airports, aircraft types and the PIC, SIC, Night, Flights and Landings figures open Search filtered to those flights.
+
 ## 2.2.0
 - Hours:minutes everywhere: the Log screen (total and night), the Flights list (each flight, night chip, pending hours), and the night breakdown now show `3:10` instead of `3.17`.
 - Edit boxes for hour columns show the automatic value as hours:minutes and accept `1:16`; the CSV still gets decimal hours (`1.27`) for MyFlightbook.
