@@ -36,7 +36,7 @@ The **Stats** and **Map** tabs cover flights logged here plus any history you im
 
 The add-on reads only the columns it needs (date, route, times, landings, takeoffs, aircraft), so it doesn't matter how many other columns your logbook has. Imported history is used only for Stats and Map. It is never added to the CSVs you import into MyFlightbook, so nothing gets imported twice. A flight that's both in the history and logged here (same date and route) is counted once.
 
-Importing again replaces the old history, so download a fresh export whenever you want the totals brought up to date. **Remove imported history** deletes it. Airports the airport list doesn't know are listed in Settings and left off the map; **Update airport database** fixes most of them, with no need to re-import.
+The history is also kept on your phone, so Stats and Map open instantly (even offline) and update when you import again. Importing again replaces the old history, so download a fresh export whenever you want the totals brought up to date. **Remove imported history** deletes it. Airports the airport list doesn't know are listed in Settings and left off the map; **Update airport database** fixes most of them, with no need to re-import.
 
 ## Configuration
 

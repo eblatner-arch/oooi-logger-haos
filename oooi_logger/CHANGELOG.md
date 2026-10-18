@@ -1,3 +1,7 @@
+## 2.5.0
+- Stats and Map open instantly. Your imported MyFlightbook history and the rest of the app's data are kept on the phone, so they draw straight away (even with no connection) and update quietly when Home Assistant has something newer, such as a new import or an airport list update.
+- The first time, Stats and Map show "Loading your logbook…" instead of flashing "No flights yet" while the data arrives.
+
 ## 2.4.0
 - Faster loading on slow connections. On a weak cell signal the app is usable in about 2 seconds the first time and under 1 second after that (it was about 4.5 seconds every time), and opening it again downloads about 30 KB instead of about 860 KB.
   - Scripts and styles are cached on the phone until an update changes them.

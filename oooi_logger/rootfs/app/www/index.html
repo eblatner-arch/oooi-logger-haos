@@ -122,6 +122,7 @@
 
   <!-- STATS -->
   <section id="view-stats" hidden style="display:grid;gap:12px">
+    <div class="card empty" id="statsLoading" hidden>Loading your logbook…</div>
     <div class="card" id="statsEmpty">
       <div class="empty"><b>No flights yet</b><span>Log a flight, or import your MyFlightbook logbook to see your totals, currency and records.</span></div>
       <button class="btn primary" id="statsGoImport" type="button">Import MyFlightbook logbook</button>
@@ -173,6 +174,7 @@
 
   <!-- MAP -->
   <section id="view-map" hidden style="display:grid;gap:12px">
+    <div class="card empty" id="mapLoading" hidden>Loading your logbook…</div>
     <div class="card" id="mapEmpty">
       <div class="empty"><b>Nothing on the map yet</b><span>Log a flight, or import your MyFlightbook logbook to see every airport and route you've flown.</span></div>
       <button class="btn primary" id="mapGoImport" type="button">Import MyFlightbook logbook</button>

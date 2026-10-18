@@ -348,6 +348,19 @@ function statusLine() {
 }
 async function refresh() {
   const st = await api('GET', 'api/state');
+  const before = histCacheKey(), wasWaiting = !$('statsLoading').hidden || !$('mapLoading').hidden;
+  applyState(st);
+  S.loaded = true;
+  PC.set('state', st);
+  // First load finished, or history changed on Home Assistant (new import or airport update):
+  // redraw an open Stats or Map. Otherwise leave them alone so a search being typed isn't reset.
+  if (wasWaiting || histCacheKey() !== before) {
+    if (!$('view-stats').hidden) renderStats();
+    if (!$('view-map').hidden) renderMap();
+  }
+  return st;
+}
+function applyState(st) {
   S.flights = st.flights || [];
   S.drive = st.drive || {}; S.scan = st.scan || {}; S.airports = st.airports || {};
   S.historyInfo = st.history || null;
@@ -359,7 +372,6 @@ async function refresh() {
   statusLine();
   if (!$('view-set').hidden) renderSettings();
   if (!$('view-list').hidden) renderList();
-  return st;
 }
 // After a change the add-on uploads to Drive a couple of seconds later; check back briefly.
 function watchSync() {
@@ -538,6 +550,11 @@ $('signOut').onclick = async () => { try { await api('POST', 'api/drive/disconne
 (async function boot() {
   setupHistoryCard();
   newFlight(false);
+  // Draw from the copy on the phone first, then bring it up to date from Home Assistant.
+  try {
+    const cached = await PC.get('state');
+    if (cached && !S.loaded) { applyState(cached); S.loaded = true; statusLine(); if (!S.editId) { S.seat = S.cfg.seat; setSeg('seatSeg', S.seat); update(); } loadHistory().catch(() => {}); }
+  } catch (_) {}
   try { await refresh(); if (!S.editId) { S.seat = S.cfg.seat; setSeg('seatSeg', S.seat); update(); } }
   catch (e) { setSync('bad', 'Cannot reach the add-on'); toast(e.message); }
   setInterval(() => { if (document.visibilityState === 'visible') refresh().catch(() => {}); }, 60000);

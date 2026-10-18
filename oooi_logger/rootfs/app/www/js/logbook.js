@@ -18,12 +18,42 @@ const fmtDate = (iso, opts) => (iso ? new Date(iso + 'T12:00:00Z').toLocaleDateS
 const addDays = (iso, n) => { const d = new Date(iso + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 const todayIso = () => todayLocal();
 
+// ---------- Copy kept on the phone ----------
+// The last state and the imported MyFlightbook history are saved in the browser's own storage
+// (IndexedDB), so Stats and Map draw at once from the copy and update if Home Assistant has newer.
+const PC = (() => {
+  let dbp = null;
+  const open = () => dbp || (dbp = new Promise((res, rej) => {
+    let r;
+    try { r = indexedDB.open('oooi-logger', 1); } catch (e) { rej(e); return; }
+    r.onupgradeneeded = () => r.result.createObjectStore('kv');
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  }));
+  const tx = async (mode, fn) => { const d = await open(); return new Promise((res, rej) => { const t = d.transaction('kv', mode); const q = fn(t.objectStore('kv')); t.oncomplete = () => res(q && q.result); t.onerror = () => rej(t.error); }); };
+  return {
+    get: (k) => tx('readonly', (s) => s.get(k)).catch(() => null),
+    set: (k, v) => tx('readwrite', (s) => s.put(v, k)).catch(() => null),
+    del: (k) => tx('readwrite', (s) => s.delete(k)).catch(() => null),
+  };
+})();
+// Which history copy is current: the import, plus the airport list the codes were matched against.
+const histCacheKey = () => {
+  const info = S.historyInfo; if (!info || !info.imported_at) return null;
+  const a = S.airports || {};
+  return `${info.imported_at}|${a.updated || ''}|${a.count || ''}`;
+};
+function useHistory(key, j) {
+  LB.hist = j.entries || []; LB.histKey = key; LB.unknown = j.unknown_airports || []; LB.unknownN = j.unknown_airport_count || 0;
+}
 async function loadHistory() {
-  const info = S.historyInfo, key = info ? info.imported_at : null;
+  const key = histCacheKey();
   if (!key) { LB.hist = []; LB.histKey = null; LB.unknown = []; LB.unknownN = 0; return; }
   if (LB.histKey === key) return;
+  const cached = await PC.get('history');
+  if (cached && cached.key === key) { useHistory(key, cached.j); return; }
   const j = await api('GET', 'api/history');
-  LB.hist = j.entries || []; LB.histKey = key; LB.unknown = j.unknown_airports || []; LB.unknownN = j.unknown_airport_count || 0;
+  useHistory(key, j);
+  PC.set('history', { key, j });
 }
 
 // Flights logged in this add-on, in the same shape as imported history (with per-flight edits applied).
@@ -195,8 +225,9 @@ function topList(box, rows, empty) {
 
 async function renderStats() {
   try { await loadHistory(); } catch (e) { toast(e.message); }
-  const all = allEntries();
-  $('statsEmpty').hidden = !!all.length; $('statsBody').hidden = !all.length;
+  const all = allEntries(), waiting = !all.length && !S.loaded;
+  $('statsLoading').hidden = !waiting;
+  $('statsEmpty').hidden = !!all.length || waiting; $('statsBody').hidden = !all.length;
   $('statsImportHint').hidden = !!LB.histKey;
   if (!all.length) return;
   setStatsView(LB.statsView || 'overview');
@@ -367,8 +398,9 @@ function selectAirport(code) {
 }
 async function renderMap() {
   try { await loadHistory(); } catch (e) { toast(e.message); }
-  const all = allEntries();
-  $('mapEmpty').hidden = !!all.length; $('mapBody').hidden = !all.length;
+  const all = allEntries(), waiting = !all.length && !S.loaded;
+  $('mapLoading').hidden = !waiting;
+  $('mapEmpty').hidden = !!all.length || waiting; $('mapBody').hidden = !all.length;
   $('mapImportHint').hidden = !!LB.histKey;
   if (!all.length) return;
   fillPeriodSelect($('mapPeriod'), all);
