@@ -1,3 +1,6 @@
+## 2.7.5
+- Claude now has to answer through a fixed form (a tool with one field per value) instead of free text, so it can't add explanations around the values. Answers stay around 80 tokens and can't be cut off or missed.
+
 ## 2.7.4
 - Claude's answer limit raised so a long reply is never cut off mid-answer (a cut-off reply was the cause of the occasional "Claude could not read the page"). Since 2.7.2 Claude answers with the values only, about 80 tokens.
 
