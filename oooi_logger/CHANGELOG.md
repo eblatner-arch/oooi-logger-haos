@@ -1,3 +1,8 @@
+## 2.7.0
+- **Scan with Claude.** Add `anthropic_api_key` in the Configuration tab to read OOOI photos with Claude Haiku, which usually answers in a couple of seconds. With both a Claude and a Gemini key, each photo goes to both at once and the first answer is used (`scan_provider: auto`); set `scan_provider` to `claude` or `gemini` to use just one. See **Claude key** in the Documentation.
+- The scan timer names the service that answered.
+- Settings → Photo scanning shows which services are in use, and the photo size options are now just Tiny, Small and Full photo.
+
 ## 2.6.2
 - Faster scans when Gemini stalls. Gemini sometimes holds a request for 20–40 seconds even though the same photo normally takes about a second. If there's no answer after 4 seconds the add-on now sends the same photo again (and once more at 9 seconds) and uses whichever answer comes back first.
 - Scans ask Gemini Flash models for minimal thinking, since reading the screen needs no reasoning.

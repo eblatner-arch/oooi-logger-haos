@@ -44,6 +44,9 @@ The history is also kept on your phone, so Stats and Map open instantly (even of
 |---|---|
 | `gemini_api_key` | Key from Google AI Studio. Needed for photo scanning. Stays on your HA box. |
 | `gemini_model` | Gemini model ID. Default `gemini-3.5-flash-lite`. |
+| `anthropic_api_key` | Key from the Anthropic Console, to scan with Claude (optional). Stays on your HA box. |
+| `claude_model` | Claude model ID. Default `claude-haiku-5-5`. |
+| `scan_provider` | `auto` (default): use every service that has a key, sending each photo to both at once and taking the first answer. `claude` or `gemini`: use only that one. |
 | `google_client_id` | OAuth client ID for Drive upload (optional). See **Google Drive setup** below. |
 | `google_client_secret` | That client's secret. |
 | `drive_folder` | Drive folder name. Default `OOOI Logger (Home Assistant)`. |
@@ -181,3 +184,12 @@ The add-on creates the folder in your Drive and uploads the files after every ch
 
 <https://aistudio.google.com/apikey> → Create API key → paste into `gemini_api_key`.
 Free-tier note: Google may use free-tier inputs (your OOOI photos) to improve its products. Use a paid key if that matters to you. Photo scanning is optional; you can always type the times in.
+
+## Claude key (photo scanning, optional)
+
+Gemini's free tier sometimes takes 15–40 seconds to answer. Claude Haiku usually answers in a couple of seconds.
+
+1. <https://console.anthropic.com> → sign in → **Billing**: add a little credit (Claude's API has no free tier).
+2. **API Keys** → **Create Key** → paste it into `anthropic_api_key` and restart the add-on.
+
+With both keys set (and `scan_provider: auto`), every photo goes to Claude and Gemini at the same time and the first answer fills in the form. A scan costs a small fraction of a cent with Claude Haiku: a 1024 px photo is roughly 1,300 input tokens and the answer under 100.

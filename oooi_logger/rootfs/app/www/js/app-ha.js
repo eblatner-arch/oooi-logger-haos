@@ -214,9 +214,9 @@ const blobToB64 = (b) => new Promise((res, rej) => { const r = new FileReader();
 // Scan method (Settings → Photo scanning), kept on this device: a small grayscale photo uploads
 // about six times faster on a weak signal; the full photo is the original 1600 px color.
 const SCAN_METHODS = {
-  tiny: { max: 800, gray: true, q: 0.45, label: 'Gemini · tiny photo', info: '800 px grayscale, lower quality (about half the small photo) to Home Assistant, then Gemini. Fastest on a very weak signal; small digits are more likely to be misread.' },
-  small: { max: 1024, gray: true, q: 0.6, label: 'Gemini · small photo', info: '1024 px grayscale photo (about a sixth of the size) to Home Assistant, then Gemini. Best on weak signal.' },
-  full: { max: 1600, gray: false, q: 0.88, label: 'Gemini · full photo', info: '1600 px color photo to Home Assistant, then Gemini. Slower to upload on weak signal.' },
+  tiny: { max: 800, gray: true, q: 0.45, label: 'Tiny photo', info: '800 px grayscale, lower quality (about half the small photo) to Home Assistant, then to the AI. Fastest on a very weak signal; small digits are more likely to be misread.' },
+  small: { max: 1024, gray: true, q: 0.6, label: 'Small photo', info: '1024 px grayscale photo (about a sixth of the full photo) to Home Assistant, then to the AI. Best on weak signal.' },
+  full: { max: 1600, gray: false, q: 0.88, label: 'Full photo', info: '1600 px color photo to Home Assistant, then to the AI. Slower to upload on weak signal.' },
 };
 const scanMethod = () => { try { const v = localStorage.getItem('scanMethod'); return SCAN_METHODS[v] ? v : 'small'; } catch (_) { return 'small'; } };
 // Timer for debugging, shown under the scan message: resize, connection, Gemini, total.
@@ -226,9 +226,11 @@ async function scanViaAddon(file) {
   const t1 = performance.now();
   const kb = Math.round(blob.size / 1024), parts = [`Resize ${((t1 - t0) / 1000).toFixed(1)} s (→ ${m.max} px, ${kb} KB)`];
   const done = (ok, d) => {
-    const req = (performance.now() - t1) / 1000, g = d && d.gemini_ms != null ? d.gemini_ms / 1000 : null;
-    const nth = d && d.gemini_request > 1 ? ` (answer from request ${d.gemini_request} of ${d.gemini_requests})` : '';
-    if (g != null) parts.push(`connection ${Math.max(0, req - g).toFixed(1)} s`, `Gemini ${g.toFixed(1)} s${nth}`);
+    const req = (performance.now() - t1) / 1000, ms = d && (d.scan_ms != null ? d.scan_ms : d.gemini_ms), g = ms != null ? ms / 1000 : null;
+    const who = (d && d.scan_provider) || 'Gemini';
+    const nth = d && who === 'Gemini' && d.gemini_request > 1 ? ` (answer from request ${d.gemini_request} of ${d.gemini_requests})` : '';
+    const raced = d && d.scan_raced ? ' (first of Claude and Gemini)' : '';
+    if (g != null) parts.push(`connection ${Math.max(0, req - g).toFixed(1)} s`, `${who} ${g.toFixed(1)} s${nth}${raced}`);
     else parts.push(`upload + Gemini + answer ${req.toFixed(1)} s`);
     parts.push(`total ${((performance.now() - t0) / 1000).toFixed(1)} s${ok ? '' : ' (failed)'}`);
     const el = $('scanTime'); el.textContent = `${m.label}: ${parts.join(' · ')}`; el.hidden = false;
@@ -241,7 +243,7 @@ $('photo').addEventListener('change', async (e) => {
   if (!file) return;
   const msg = $('scanMsg');
   try { $('thumb').src = URL.createObjectURL(file); $('thumb').hidden = false; } catch (_) {}
-  if (!S.scan.configured) { msg.className = 'msg warn'; msg.textContent = 'Add gemini_api_key in the add-on Configuration tab to scan. You can type the times in below.'; msg.hidden = false; return; }
+  if (!S.scan.configured) { msg.className = 'msg warn'; msg.textContent = 'Add gemini_api_key or anthropic_api_key in the add-on Configuration tab to scan. You can type the times in below.'; msg.hidden = false; return; }
   msg.className = 'msg'; msg.textContent = 'Reading the ACARS page…'; msg.hidden = false; $('scanTime').hidden = true;
   try {
     const d = await scanViaAddon(file);
@@ -449,8 +451,8 @@ function renderSettings() {
     : `${(ap.count || 0).toLocaleString()} airports from the copy built into the add-on. Update to download the latest open-source airport list (airportsdata on GitHub) to your Home Assistant.`;
   $('scanMethod').value = scanMethod(); $('scanMethodInfo').textContent = SCAN_METHODS[scanMethod()].info;
   $('scanInfo').textContent = S.scan.configured
-    ? `Gemini is set up in the add-on Configuration (model ${S.scan.model}). Photos go from Home Assistant to Gemini; the key never reaches your phone.`
-    : 'Add gemini_api_key (and optionally gemini_model) in the add-on Configuration tab, then restart the add-on to turn on photo scanning.';
+    ? `Photos go from Home Assistant to ${(S.scan.providers || [`Gemini (${S.scan.model})`]).join(' and ')}${(S.scan.providers || []).length > 1 ? ' at the same time, and the first answer is used' : ''}. The keys never reach your phone. Change scan_provider, anthropic_api_key or gemini_api_key in the add-on Configuration.`
+    : 'Add gemini_api_key (Google AI Studio) or anthropic_api_key (Anthropic Console) in the add-on Configuration tab, then restart the add-on to turn on photo scanning.';
   $('aboutLine').textContent = 'Flights are stored on your Home Assistant (included in backups), written to /share/oooi_logger, and uploaded to Google Drive when connected.';
 }
 // Takes effect immediately; it only changes how Stats shows hours, never the CSVs.
