@@ -1,3 +1,6 @@
+## 2.8.2
+- Claude scans cost about half as much again: back to a plain JSON answer (about 1,050 tokens in and 80 out per scan) instead of the answer form from 2.7.5, which roughly doubled the tokens. Wordy replies are still caught: Claude is asked once more automatically, and every read is still checked before it's used.
+
 ## 2.8.1
 - Scans name the Claude model that Anthropic says actually answered (from Anthropic's reply, not the setting), and show its message ID and the tokens billed. The same line goes to the add-on's Log tab, so any scan can be matched to its entry in console.anthropic.com → Logs.
 
