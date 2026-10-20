@@ -1,3 +1,6 @@
+## 2.7.2
+- Fewer "Claude could not read the page" errors: Claude is told to answer with the values only, and if it replies in words instead, the add-on asks it once more automatically. What Claude said is written to the add-on's Log tab, so a misread can be looked into.
+
 ## 2.7.1
 - Fix: scanning with Claude failed with "`temperature` is deprecated for this model". The add-on no longer sends that setting to Claude.
 
