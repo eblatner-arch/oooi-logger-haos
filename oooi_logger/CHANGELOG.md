@@ -1,3 +1,6 @@
+## 2.7.1
+- Fix: scanning with Claude failed with "`temperature` is deprecated for this model". The add-on no longer sends that setting to Claude.
+
 ## 2.7.0
 - **Scan with Claude.** Add `anthropic_api_key` in the Configuration tab to read OOOI photos with Claude Haiku, which usually answers in a couple of seconds. With both a Claude and a Gemini key, each photo goes to both at once and the first answer is used (`scan_provider: auto`); set `scan_provider` to `claude` or `gemini` to use just one. See **Claude key** in the Documentation.
 - The scan timer names the service that answered.

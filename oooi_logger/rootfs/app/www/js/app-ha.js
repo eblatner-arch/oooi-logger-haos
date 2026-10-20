@@ -231,7 +231,7 @@ async function scanViaAddon(file) {
     const nth = d && who === 'Gemini' && d.gemini_request > 1 ? ` (answer from request ${d.gemini_request} of ${d.gemini_requests})` : '';
     const raced = d && d.scan_raced ? ' (first of Claude and Gemini)' : '';
     if (g != null) parts.push(`connection ${Math.max(0, req - g).toFixed(1)} s`, `${who} ${g.toFixed(1)} s${nth}${raced}`);
-    else parts.push(`upload + Gemini + answer ${req.toFixed(1)} s`);
+    else parts.push(`upload + reading + answer ${req.toFixed(1)} s`);
     parts.push(`total ${((performance.now() - t0) / 1000).toFixed(1)} s${ok ? '' : ' (failed)'}`);
     const el = $('scanTime'); el.textContent = `${m.label}: ${parts.join(' · ')}`; el.hidden = false;
   };
