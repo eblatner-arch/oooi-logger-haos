@@ -1,3 +1,9 @@
+## 2.6.0
+- An **HA** badge next to the title shows whether the app can reach your Home Assistant: green when connected, gray when not. Tap it to check again.
+- **Scan method** (Settings → Photo scanning): **Gemini · small photo** (new default) sends a 1024 px grayscale photo, about a sixth of the size, so scans are much faster on a weak signal; **Gemini · full photo** sends the 1600 px color photo as before. The choice is kept on each phone.
+- A small timer under each scan shows where the time went: resizing on the phone, the connection, Gemini itself, and the total.
+- Same features as the native iPhone app, so the web app is a full fallback. The previous release is kept on the `restore-2.5.1` branch.
+
 ## 2.5.1
 - Photo scans report how long Gemini itself took, so the iPhone app's scan timer can split the time between your connection and Gemini.
 

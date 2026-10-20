@@ -116,7 +116,7 @@ function formIsEmpty() { const f = readForm(); return !f.flightNumber && !f.tail
 function newFlight(keepDate) {
   S.editId = null; S.scannedTrip = null;
   fillForm({ date: keepDate ? $('date').value || todayLocal() : todayLocal(), duty: 'PF', seat: S.cfg.seat });
-  $('photo').value = ''; $('thumb').hidden = true; $('scanMsg').hidden = true;
+  $('photo').value = ''; $('thumb').hidden = true; $('scanMsg').hidden = true; $('scanTime').hidden = true;
   $('editBanner').hidden = true; $('delBtn').hidden = true; $('delConfirm').hidden = true;
   $('saveBtn').textContent = 'Save flight';
 }
@@ -189,15 +189,20 @@ $('cancelEdit').onclick = () => newFlight(false);
 
 
 // ---------- Scan (Gemini runs on the add-on) ----------
-function downscale(file, max) {
+function downscale(file, max, gray, quality) {
   return new Promise((res, rej) => {
     const url = URL.createObjectURL(file); const img = new Image();
     img.onload = () => {
       const k = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
       const c = document.createElement('canvas'); c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
-      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      const g = c.getContext('2d'); g.drawImage(img, 0, 0, c.width, c.height);
+      if (gray) {
+        const d = g.getImageData(0, 0, c.width, c.height), p = d.data;
+        for (let i = 0; i < p.length; i += 4) { const y = 0.299 * p[i] + 0.587 * p[i + 1] + 0.114 * p[i + 2]; p[i] = p[i + 1] = p[i + 2] = y; }
+        g.putImageData(d, 0, 0);
+      }
       URL.revokeObjectURL(url);
-      c.toBlob((b) => (b ? res(b) : rej(new Error('encode'))), 'image/jpeg', 0.88);
+      c.toBlob((b) => (b ? res(b) : rej(new Error('encode'))), 'image/jpeg', quality || 0.88);
     };
     img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('decode')); };
     img.src = url;
@@ -206,9 +211,28 @@ function downscale(file, max) {
 const blobToB64 = (b) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1]); r.onerror = () => rej(r.error); r.readAsDataURL(b); });
 
 
+// Scan method (Settings → Photo scanning), kept on this device: a small grayscale photo uploads
+// about six times faster on a weak signal; the full photo is the original 1600 px color.
+const SCAN_METHODS = {
+  small: { max: 1024, gray: true, q: 0.6, info: '1024 px grayscale photo (about a sixth of the size) to Home Assistant, then Gemini. Best on weak signal.' },
+  full: { max: 1600, gray: false, q: 0.88, info: '1600 px color photo to Home Assistant, then Gemini. Slower to upload on weak signal.' },
+};
+const scanMethod = () => { try { const v = localStorage.getItem('scanMethod'); return SCAN_METHODS[v] ? v : 'small'; } catch (_) { return 'small'; } };
+// Timer for debugging, shown under the scan message: resize, connection, Gemini, total.
 async function scanViaAddon(file) {
-  const blob = await downscale(file, 1600);
-  return api('POST', 'api/scan', undefined, blob);
+  const m = SCAN_METHODS[scanMethod()], t0 = performance.now();
+  const blob = await downscale(file, m.max, m.gray, m.q);
+  const t1 = performance.now();
+  const kb = Math.round(blob.size / 1024), parts = [`Resize ${((t1 - t0) / 1000).toFixed(1)} s (→ ${m.max} px, ${kb} KB)`];
+  const done = (ok, d) => {
+    const req = (performance.now() - t1) / 1000, g = d && d.gemini_ms != null ? d.gemini_ms / 1000 : null;
+    if (g != null) parts.push(`connection ${Math.max(0, req - g).toFixed(1)} s`, `Gemini ${g.toFixed(1)} s`);
+    else parts.push(`upload + Gemini + answer ${req.toFixed(1)} s`);
+    parts.push(`total ${((performance.now() - t0) / 1000).toFixed(1)} s${ok ? '' : ' (failed)'}`);
+    const el = $('scanTime'); el.textContent = `${m.max === 1024 ? 'Gemini · small photo' : 'Gemini · full photo'}: ${parts.join(' · ')}`; el.hidden = false;
+  };
+  try { const d = await api('POST', 'api/scan', undefined, blob); done(true, d); return d; }
+  catch (e) { done(false); throw e; }
 }
 $('photo').addEventListener('change', async (e) => {
   const file = e.target.files && e.target.files[0];
@@ -216,7 +240,7 @@ $('photo').addEventListener('change', async (e) => {
   const msg = $('scanMsg');
   try { $('thumb').src = URL.createObjectURL(file); $('thumb').hidden = false; } catch (_) {}
   if (!S.scan.configured) { msg.className = 'msg warn'; msg.textContent = 'Add gemini_api_key in the add-on Configuration tab to scan. You can type the times in below.'; msg.hidden = false; return; }
-  msg.className = 'msg'; msg.textContent = 'Reading the ACARS page…'; msg.hidden = false;
+  msg.className = 'msg'; msg.textContent = 'Reading the ACARS page…'; msg.hidden = false; $('scanTime').hidden = true;
   try {
     const d = await scanViaAddon(file);
     const clean = (v, re) => (v == null ? '' : String(v).replace(/Ø/g, '0').toUpperCase().replace(re, ''));
@@ -275,7 +299,7 @@ $('delYes').onclick = async () => {
 function editFlight(id) {
   const f = S.flights.find((x) => x.id === id); if (!f) return;
   S.editId = id; S.scannedTrip = null; fillForm(f);
-  $('photo').value = ''; $('thumb').hidden = true; $('scanMsg').hidden = true; $('delConfirm').hidden = true;
+  $('photo').value = ''; $('thumb').hidden = true; $('scanMsg').hidden = true; $('scanTime').hidden = true; $('delConfirm').hidden = true;
   $('editBanner').hidden = false; $('editWhat').textContent = `${f.date} ${f.from}–${f.to}`;
   $('delBtn').hidden = false; $('saveBtn').textContent = 'Save changes';
   show('log');
@@ -346,8 +370,18 @@ function statusLine() {
   if (d.last_sync) return setSync('ok', 'Drive synced ' + new Date(d.last_sync).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }));
   return setSync('', 'Connected to Drive');
 }
+// Header badge: green while this page can reach the add-on, gray when it can't.
+function setHA(on) {
+  const b = $('haBadge'); b.classList.toggle('on', on);
+  b.setAttribute('aria-label', on ? 'Connected to Home Assistant' : 'Not connected to Home Assistant');
+}
+$('haBadge').onclick = () => { refresh().catch(() => {}); };
+window.addEventListener('offline', () => setHA(false));
+window.addEventListener('online', () => { refresh().catch(() => {}); });
 async function refresh() {
-  const st = await api('GET', 'api/state');
+  let st;
+  try { st = await api('GET', 'api/state'); } catch (e) { setHA(false); throw e; }
+  setHA(true);
   const before = histCacheKey(), wasWaiting = !$('statsLoading').hidden || !$('mapLoading').hidden;
   applyState(st);
   S.loaded = true;
@@ -411,6 +445,7 @@ function renderSettings() {
   $('airportInfo').textContent = ap.source === 'updated'
     ? `${(ap.count || 0).toLocaleString()} airports, updated ${new Date(ap.updated).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}. Downloads the latest open-source airport list (airportsdata on GitHub) to your Home Assistant.`
     : `${(ap.count || 0).toLocaleString()} airports from the copy built into the add-on. Update to download the latest open-source airport list (airportsdata on GitHub) to your Home Assistant.`;
+  $('scanMethod').value = scanMethod(); $('scanMethodInfo').textContent = SCAN_METHODS[scanMethod()].info;
   $('scanInfo').textContent = S.scan.configured
     ? `Gemini is set up in the add-on Configuration (model ${S.scan.model}). Photos go from Home Assistant to Gemini; the key never reaches your phone.`
     : 'Add gemini_api_key (and optionally gemini_model) in the add-on Configuration tab, then restart the add-on to turn on photo scanning.';
@@ -542,6 +577,7 @@ $('updateAirports').onclick = async () => {
     setTimeout(() => location.reload(), 1200);   // reload so this page uses the new list too
   } catch (e) { toast(e.message); b.disabled = false; b.textContent = 'Update airport database'; }
 };
+$('scanMethod').onchange = (e) => { try { localStorage.setItem('scanMethod', e.target.value); } catch (_) {} $('scanMethodInfo').textContent = SCAN_METHODS[scanMethod()].info; };
 $('copyCode').onclick = async () => { try { await navigator.clipboard.writeText($('devUser').textContent); toast('Code copied'); } catch (_) { toast('Select the code and copy it.'); } };
 $('cancelCode').onclick = async () => { clearInterval(S.poll); await api('POST', 'api/drive/cancel').catch(() => {}); await refresh(); renderSettings(); };
 $('signOut').onclick = async () => { try { await api('POST', 'api/drive/disconnect'); await refresh(); renderSettings(); toast('Disconnected from Google'); } catch (e) { toast(e.message); } };

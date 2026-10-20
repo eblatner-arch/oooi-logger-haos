@@ -20,7 +20,10 @@
 <body>
 <div class="wrap">
   <header class="top">
-    <h1>OOOI Flight Logger</h1>
+    <div class="titlerow">
+      <h1>OOOI Flight Logger</h1>
+      <button class="habadge" id="haBadge" type="button" aria-label="Checking the connection to Home Assistant"><span class="dot"></span>HA</button>
+    </div>
     <div class="sync" id="syncLine"><span class="dot" id="syncDot"></span><span id="syncText">Connecting…</span></div>
   </header>
 
@@ -49,6 +52,7 @@
       <div class="scan-note" id="scanNote">Take a photo of the ACARS-PREVIOUS OOOI page. Gemini reads the flight number, airports and times. Check them before saving.</div>
       <img id="thumb" class="thumb" alt="Scanned OOOI page" hidden>
       <div class="msg" id="scanMsg" hidden></div>
+      <div class="scantime mono" id="scanTime" hidden></div>
     </div>
 
     <div class="card">
@@ -313,6 +317,14 @@
     </div>
     <div class="card">
       <span class="label">Photo scanning (Gemini)</span>
+      <div class="field">
+        <label for="scanMethod">Scan method</label>
+        <select id="scanMethod">
+          <option value="small">Gemini · small photo</option>
+          <option value="full">Gemini · full photo</option>
+        </select>
+      </div>
+      <p class="small" style="margin:0" id="scanMethodInfo"></p>
       <p class="small" style="margin:0" id="scanInfo"></p>
     </div>
     <div class="card">

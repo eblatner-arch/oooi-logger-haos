@@ -237,3 +237,12 @@ details.fold[open] > summary::after { transform: rotate(180deg); }
 .toprow.link, .stat.link { cursor: pointer; border-radius: 6px; }
 .toprow.link:hover, .stat.link:hover { background: var(--bg); }
 .toprow .dir { grid-column: 1 / -1; font-size: 12px; color: var(--muted); margin-top: -4px; }
+
+/* Header: connection badge (green = this page is talking to the add-on) */
+header.top { display: grid; gap: 12px; justify-content: stretch; align-items: start; }
+.titlerow { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.habadge { font: 600 13px var(--f-display); letter-spacing: .06em; display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); cursor: pointer; flex: none; }
+.habadge .dot { width: 10px; height: 10px; background: var(--muted); opacity: .7; }
+.habadge.on { color: var(--ink); }
+.habadge.on .dot { background: var(--good); opacity: 1; }
+.scantime { font-size: 12px; color: var(--muted); }
