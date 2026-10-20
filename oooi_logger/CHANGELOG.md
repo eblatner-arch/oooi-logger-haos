@@ -1,3 +1,6 @@
+## 2.7.3
+- Drive uploads only happen when something changed. If the flights and CSVs are the same as the last upload (for example after the add-on restarts), the sync is skipped. **Sync now** still always uploads.
+
 ## 2.7.2
 - Fewer "Claude could not read the page" errors: Claude is told to answer with the values only, and if it replies in words instead, the add-on asks it once more automatically. What Claude said is written to the add-on's Log tab, so a misread can be looked into.
 
