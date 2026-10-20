@@ -1,3 +1,6 @@
+## 2.6.1
+- New scan method **Gemini · tiny photo**: 800 px grayscale at lower quality, about half the size of the small photo, for very weak signal. Small photo stays the default.
+
 ## 2.6.0
 - An **HA** badge next to the title shows whether the app can reach your Home Assistant: green when connected, gray when not. Tap it to check again.
 - **Scan method** (Settings → Photo scanning): **Gemini · small photo** (new default) sends a 1024 px grayscale photo, about a sixth of the size, so scans are much faster on a weak signal; **Gemini · full photo** sends the 1600 px color photo as before. The choice is kept on each phone.

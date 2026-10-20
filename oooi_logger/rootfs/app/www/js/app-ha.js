@@ -214,8 +214,9 @@ const blobToB64 = (b) => new Promise((res, rej) => { const r = new FileReader();
 // Scan method (Settings → Photo scanning), kept on this device: a small grayscale photo uploads
 // about six times faster on a weak signal; the full photo is the original 1600 px color.
 const SCAN_METHODS = {
-  small: { max: 1024, gray: true, q: 0.6, info: '1024 px grayscale photo (about a sixth of the size) to Home Assistant, then Gemini. Best on weak signal.' },
-  full: { max: 1600, gray: false, q: 0.88, info: '1600 px color photo to Home Assistant, then Gemini. Slower to upload on weak signal.' },
+  tiny: { max: 800, gray: true, q: 0.45, label: 'Gemini · tiny photo', info: '800 px grayscale, lower quality (about half the small photo) to Home Assistant, then Gemini. Fastest on a very weak signal; small digits are more likely to be misread.' },
+  small: { max: 1024, gray: true, q: 0.6, label: 'Gemini · small photo', info: '1024 px grayscale photo (about a sixth of the size) to Home Assistant, then Gemini. Best on weak signal.' },
+  full: { max: 1600, gray: false, q: 0.88, label: 'Gemini · full photo', info: '1600 px color photo to Home Assistant, then Gemini. Slower to upload on weak signal.' },
 };
 const scanMethod = () => { try { const v = localStorage.getItem('scanMethod'); return SCAN_METHODS[v] ? v : 'small'; } catch (_) { return 'small'; } };
 // Timer for debugging, shown under the scan message: resize, connection, Gemini, total.
@@ -229,7 +230,7 @@ async function scanViaAddon(file) {
     if (g != null) parts.push(`connection ${Math.max(0, req - g).toFixed(1)} s`, `Gemini ${g.toFixed(1)} s`);
     else parts.push(`upload + Gemini + answer ${req.toFixed(1)} s`);
     parts.push(`total ${((performance.now() - t0) / 1000).toFixed(1)} s${ok ? '' : ' (failed)'}`);
-    const el = $('scanTime'); el.textContent = `${m.max === 1024 ? 'Gemini · small photo' : 'Gemini · full photo'}: ${parts.join(' · ')}`; el.hidden = false;
+    const el = $('scanTime'); el.textContent = `${m.label}: ${parts.join(' · ')}`; el.hidden = false;
   };
   try { const d = await api('POST', 'api/scan', undefined, blob); done(true, d); return d; }
   catch (e) { done(false); throw e; }
