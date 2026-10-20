@@ -1,3 +1,6 @@
+## 2.5.1
+- Photo scans report how long Gemini itself took, so the iPhone app's scan timer can split the time between your connection and Gemini.
+
 ## 2.5.0
 - Stats and Map open instantly. Your imported MyFlightbook history and the rest of the app's data are kept on the phone, so they draw straight away (even with no connection) and update quietly when Home Assistant has something newer, such as a new import or an airport list update.
 - The first time, Stats and Map show "Loading your logbook…" instead of flashing "No flights yet" while the data arrives.
