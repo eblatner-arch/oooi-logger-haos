@@ -230,7 +230,8 @@ async function scanViaAddon(file) {
     const who = (d && d.scan_provider) || 'Gemini';
     const nth = d && who === 'Gemini' && d.gemini_request > 1 ? ` (answer from request ${d.gemini_request} of ${d.gemini_requests})` : '';
     const raced = d && d.scan_raced ? ' (first of Claude and Gemini)' : '';
-    if (g != null) parts.push(`connection ${Math.max(0, req - g).toFixed(1)} s`, `${who} ${g.toFixed(1)} s${nth}${raced}`);
+    const looked = d && d.scan_steps && d.scan_steps.length ? ` · ${d.scan_steps.join('; ')}` : '';
+    if (g != null) parts.push(`connection ${Math.max(0, req - g).toFixed(1)} s`, `${who} ${g.toFixed(1)} s${nth}${raced}${looked}`);
     else parts.push(`upload + reading + answer ${req.toFixed(1)} s`);
     parts.push(`total ${((performance.now() - t0) / 1000).toFixed(1)} s${ok ? '' : ' (failed)'}`);
     const el = $('scanTime'); el.textContent = `${m.label}: ${parts.join(' · ')}`; el.hidden = false;
@@ -451,7 +452,8 @@ function renderSettings() {
     : `${(ap.count || 0).toLocaleString()} airports from the copy built into the add-on. Update to download the latest open-source airport list (airportsdata on GitHub) to your Home Assistant.`;
   $('scanMethod').value = scanMethod(); $('scanMethodInfo').textContent = SCAN_METHODS[scanMethod()].info;
   $('scanInfo').textContent = S.scan.configured
-    ? `Photos go from Home Assistant to ${(S.scan.providers || [`Gemini (${S.scan.model})`]).join(' and ')}${(S.scan.providers || []).length > 1 ? ' at the same time, and the first answer is used' : ''}. The keys never reach your phone. Change scan_provider, anthropic_api_key or gemini_api_key in the add-on Configuration.`
+    ? (() => { const p = S.scan.providers || [`Gemini (${S.scan.model})`];
+        return `Photos are read on Home Assistant by ${p[0]}.` + (p.length > 1 ? ` If a read doesn't check out (missing times, an unknown airport, or CREW→IN not matching TRIP), ${p.slice(1).join(', then ')} take${p.length > 2 ? '' : 's'} a second look.` : '') + ' The keys never reach your phone. Change these in the add-on Configuration.'; })()
     : 'Add gemini_api_key (Google AI Studio) or anthropic_api_key (Anthropic Console) in the add-on Configuration tab, then restart the add-on to turn on photo scanning.';
   $('aboutLine').textContent = 'Flights are stored on your Home Assistant (included in backups), written to /share/oooi_logger, and uploaded to Google Drive when connected.';
 }

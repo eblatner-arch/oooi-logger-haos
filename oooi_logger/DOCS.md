@@ -45,8 +45,9 @@ The history is also kept on your phone, so Stats and Map open instantly (even of
 | `gemini_api_key` | Key from Google AI Studio. Needed for photo scanning. Stays on your HA box. |
 | `gemini_model` | Gemini model ID. Default `gemini-3.5-flash-lite`. |
 | `anthropic_api_key` | Key from the Anthropic Console, to scan with Claude (optional). Stays on your HA box. |
-| `claude_model` | Claude model ID. Default `claude-haiku-5-5`. |
-| `scan_provider` | `auto` (default): use every service that has a key, sending each photo to both at once and taking the first answer. `claude` or `gemini`: use only that one. |
+| `claude_model` | Claude model that reads each photo first. Default `claude-haiku-5-5` (fast). |
+| `claude_check_model` | Claude model that takes a second look when the first read doesn't check out. Default `claude-sonnet-5-5`. Leave empty to skip. |
+| `scan_provider` | `auto` (default): Claude first, then Claude's second look, then Gemini, using every service that has a key. `claude` or `gemini`: use only that one. |
 | `google_client_id` | OAuth client ID for Drive upload (optional). See **Google Drive setup** below. |
 | `google_client_secret` | That client's secret. |
 | `drive_folder` | Drive folder name. Default `OOOI Logger (Home Assistant)`. |
@@ -192,4 +193,4 @@ Gemini's free tier sometimes takes 15–40 seconds to answer. Claude Haiku usual
 1. <https://console.anthropic.com> → sign in → **Billing**: add a little credit (Claude's API has no free tier).
 2. **API Keys** → **Create Key** → paste it into `anthropic_api_key` and restart the add-on.
 
-With both keys set (and `scan_provider: auto`), every photo goes to Claude and Gemini at the same time and the first answer fills in the form. A scan costs a small fraction of a cent with Claude Haiku: a 1024 px photo is roughly 1,300 input tokens and the answer under 100.
+Every read is checked before it fills in the form: all five times present, both airports in the airport list, the times in order, and CREW→IN matching TRIP. If Claude Haiku's read doesn't check out (or it fails), Claude Sonnet takes a second look, then Gemini if you have a key. Most scans finish with Haiku in about a second. A scan costs a small fraction of a cent with Claude Haiku: a 1024 px photo is roughly 1,300 input tokens and the answer under 100.
