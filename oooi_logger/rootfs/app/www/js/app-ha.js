@@ -227,7 +227,8 @@ async function scanViaAddon(file) {
   const kb = Math.round(blob.size / 1024), parts = [`Resize ${((t1 - t0) / 1000).toFixed(1)} s (→ ${m.max} px, ${kb} KB)`];
   const done = (ok, d) => {
     const req = (performance.now() - t1) / 1000, g = d && d.gemini_ms != null ? d.gemini_ms / 1000 : null;
-    if (g != null) parts.push(`connection ${Math.max(0, req - g).toFixed(1)} s`, `Gemini ${g.toFixed(1)} s`);
+    const nth = d && d.gemini_request > 1 ? ` (answer from request ${d.gemini_request} of ${d.gemini_requests})` : '';
+    if (g != null) parts.push(`connection ${Math.max(0, req - g).toFixed(1)} s`, `Gemini ${g.toFixed(1)} s${nth}`);
     else parts.push(`upload + Gemini + answer ${req.toFixed(1)} s`);
     parts.push(`total ${((performance.now() - t0) / 1000).toFixed(1)} s${ok ? '' : ' (failed)'}`);
     const el = $('scanTime'); el.textContent = `${m.label}: ${parts.join(' · ')}`; el.hidden = false;

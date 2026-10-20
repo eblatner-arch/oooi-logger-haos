@@ -1,3 +1,8 @@
+## 2.6.2
+- Faster scans when Gemini stalls. Gemini sometimes holds a request for 20–40 seconds even though the same photo normally takes about a second. If there's no answer after 4 seconds the add-on now sends the same photo again (and once more at 9 seconds) and uses whichever answer comes back first.
+- Scans ask Gemini Flash models for minimal thinking, since reading the screen needs no reasoning.
+- The scan timer says when a repeated request was the one that answered.
+
 ## 2.6.1
 - New scan method **Gemini · tiny photo**: 800 px grayscale at lower quality, about half the size of the small photo, for very weak signal. Small photo stays the default.
 
