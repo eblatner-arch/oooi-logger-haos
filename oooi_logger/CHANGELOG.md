@@ -1,3 +1,6 @@
+## 2.7.4
+- Claude's answer limit raised so a long reply is never cut off mid-answer (a cut-off reply was the cause of the occasional "Claude could not read the page"). Since 2.7.2 Claude answers with the values only, about 80 tokens.
+
 ## 2.7.3
 - Drive uploads only happen when something changed. If the flights and CSVs are the same as the last upload (for example after the add-on restarts), the sync is skipped. **Sync now** still always uploads.
 
