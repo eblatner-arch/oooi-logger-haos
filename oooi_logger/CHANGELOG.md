@@ -1,3 +1,6 @@
+## 2.8.1
+- Scans name the Claude model that Anthropic says actually answered (from Anthropic's reply, not the setting), and show its message ID and the tokens billed. The same line goes to the add-on's Log tab, so any scan can be matched to its entry in console.anthropic.com → Logs.
+
 ## 2.8.0
 - **Checked scans.** Every read is checked before it fills in the form: all five times present, both airports known, the times in order, and CREW→IN matching the TRIP time. If Claude Haiku's read doesn't check out, Claude Sonnet takes a second look (new option `claude_check_model`, default `claude-sonnet-5-5`), then Gemini if you have a key. Most scans still finish with Haiku in about a second; the rare second look adds a couple of seconds and well under a cent.
 - This replaces sending every photo to Claude and Gemini at the same time, which used whichever answer came first even if it was the wrong one.

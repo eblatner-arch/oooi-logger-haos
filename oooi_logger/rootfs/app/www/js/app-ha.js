@@ -234,6 +234,7 @@ async function scanViaAddon(file) {
     if (g != null) parts.push(`connection ${Math.max(0, req - g).toFixed(1)} s`, `${who} ${g.toFixed(1)} s${nth}${raced}${looked}`);
     else parts.push(`upload + reading + answer ${req.toFixed(1)} s`);
     parts.push(`total ${((performance.now() - t0) / 1000).toFixed(1)} s${ok ? '' : ' (failed)'}`);
+    if (d && d.scan_message_id) parts.push(`${d.scan_model} · ${d.scan_tokens} tokens · ${d.scan_message_id}`);
     const el = $('scanTime'); el.textContent = `${m.label}: ${parts.join(' · ')}`; el.hidden = false;
   };
   try { const d = await api('POST', 'api/scan', undefined, blob); done(true, d); return d; }
