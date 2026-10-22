@@ -1,3 +1,6 @@
+## 2.8.3
+- Stats totals now match MyFlightbook to the minute. Hours were added up as two-decimal numbers (1:16 = 1.27), and the rounding drifted a few minutes over a career; each flight is now counted in whole minutes before adding up. Works on your existing import (no need to import again).
+
 ## 2.8.2
 - Claude scans cost about half as much again: back to a plain JSON answer (about 1,050 tokens in and 80 out per scan) instead of the answer form from 2.7.5, which roughly doubled the tokens. Wordy replies are still caught: Claude is asked once more automatically, and every read is still checked before it's used.
 

@@ -42,8 +42,13 @@ const histCacheKey = () => {
   const a = S.airports || {};
   return `${info.imported_at}|${a.updated || ''}|${a.count || ''}`;
 };
+// Hours to the nearest minute. Logbooks keep whole minutes, but decimal hours (1.27) are rounded to
+// 0.01 h, so summing them drifts a few minutes over a career. Snapping each flight back to its
+// minute first makes totals match MyFlightbook's exactly.
+const qm = (v) => Math.round((+v || 0) * 60) / 60;
+const snapEntry = (e) => ({ ...e, t: qm(e.t), pic: qm(e.pic), sic: qm(e.sic), n: qm(e.n), x: qm(e.x) });
 function useHistory(key, j) {
-  LB.hist = j.entries || []; LB.histKey = key; LB.unknown = j.unknown_airports || []; LB.unknownN = j.unknown_airport_count || 0;
+  LB.hist = (j.entries || []).map(snapEntry); LB.histKey = key; LB.unknown = j.unknown_airports || []; LB.unknownN = j.unknown_airport_count || 0;
 }
 async function loadHistory() {
   const key = histCacheKey();
@@ -61,8 +66,8 @@ function appEntries() {
   const out = [];
   for (const f of S.flights || []) {
     const vals = csvValues(f, S.cfg); if (!vals) continue;
-    const ov = f.override || {}, get = (k) => (k in ov ? ov[k] : vals[k]), n = (k) => +get(k) || 0;
-    out.push({ d: f.date, r: [apCode(f.from), apCode(f.to)], t: n('Total Flight Time'), pic: n('PIC'), sic: n('SIC'), n: n('Night'), x: n('X-Country'),
+    const ov = f.override || {}, get = (k) => (k in ov ? ov[k] : vals[k]), n = (k) => +get(k) || 0, h = (k) => qm(get(k));
+    out.push({ d: f.date, r: [apCode(f.from), apCode(f.to)], t: h('Total Flight Time'), pic: h('PIC'), sic: h('SIC'), n: h('Night'), x: h('X-Country'),
       l: n('Landings'), ld: n('FS Day Landings'), ln: n('FS Night Landings'), to: n('Takeoffs (any)'), ton: n('Takeoffs - Night'),
       reg: f.tail || '', m: S.cfg.model, fn: f.flightNumber || '', src: 'app', id: f.id, duty: f.duty || 'PF' });
   }
