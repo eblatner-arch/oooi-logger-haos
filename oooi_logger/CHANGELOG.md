@@ -1,3 +1,7 @@
+## 2.9.0
+- **Live**, like the Flight Tracker add-on: the badge next to the title now reads LIVE and turns green while the page has a live connection to the add-on. Every change shows up at once without reloading (a flight saved from the iPhone app or another device, a Drive upload starting or finishing), and the dot pulses when one arrives. Gray means not live; the page still checks every minute and reconnects by itself, including right after the phone wakes up.
+- New `api/events` stream (server-sent events, a ping every 15 s) and a one-word Drive state in `api/state`, used by the web page and the iPhone app.
+
 ## 2.8.3
 - Stats totals now match MyFlightbook to the minute. Hours were added up as two-decimal numbers (1:16 = 1.27), and the rounding drifted a few minutes over a career; each flight is now counted in whole minutes before adding up. Works on your existing import (no need to import again).
 

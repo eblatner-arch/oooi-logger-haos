@@ -376,18 +376,54 @@ function statusLine() {
   if (d.last_sync) return setSync('ok', 'Drive synced ' + new Date(d.last_sync).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }));
   return setSync('', 'Connected to Drive');
 }
-// Header badge: green while this page can reach the add-on, gray when it can't.
-function setHA(on) {
-  const b = $('haBadge'); b.classList.toggle('on', on);
-  b.setAttribute('aria-label', on ? 'Connected to Home Assistant' : 'Not connected to Home Assistant');
+// ---------- Live (same as the Flight Tracker add-on) ----------
+// The add-on streams an event whenever anything changes (api/events) and a ping every 15 s.
+// Live is green while that stream is open and pinging, and each change refreshes the page at once
+// (a flight saved from the phone app, a Drive upload finishing). Gray means not live: the page
+// still checks every minute. iOS can freeze a background page and leave the stream looking open,
+// so it reconnects on coming back and whenever nothing has arrived for 35 s.
+const $ha = $('haBadge');
+let haLastEvent = 0;
+function setHA(on, changed) {
+  if (changed) haLastEvent = Date.now();
+  $ha.classList.toggle('on', !!on);
+  $ha.title = on ? `Live: connected to Home Assistant${haLastEvent ? ` · last change ${Math.round((Date.now() - haLastEvent) / 1000)} s ago` : ''}` : 'Not live: checking every minute';
+  $ha.setAttribute('aria-label', on ? 'Live: connected to Home Assistant' : 'Not live');
+  if (changed) { $ha.classList.remove('flash'); void $ha.offsetWidth; $ha.classList.add('flash'); }
 }
-$('haBadge').onclick = () => { refresh().catch(() => {}); };
-window.addEventListener('offline', () => setHA(false));
-window.addEventListener('online', () => { refresh().catch(() => {}); });
+let es = null, esSeen = 0, esRetry = null, liveT = null, lastWake = 0;
+function liveRefresh() {
+  if (liveT || document.hidden) return;
+  liveT = setTimeout(() => { liveT = null; refresh().catch(() => {}); }, 400);   // a burst of changes is one refresh
+}
+function esDrop() { if (es) { try { es.close(); } catch (_) {} } es = null; }
+function esConnect(force) {
+  if (!window.EventSource || (es && !force)) return;
+  esDrop(); clearTimeout(esRetry);
+  try {
+    es = new EventSource('api/events');
+    es.onopen = () => { esSeen = Date.now(); setHA(true); };
+    es.addEventListener('ping', () => { esSeen = Date.now(); setHA(true); });
+    es.onmessage = () => { esSeen = Date.now(); setHA(true, true); liveRefresh(); };
+    es.onerror = () => { setHA(false); esDrop(); esRetry = setTimeout(() => esConnect(), 2000); };
+  } catch (_) { es = null; }
+}
+function wake() {
+  if (document.hidden || Date.now() - lastWake < 1500) return;
+  lastWake = Date.now();
+  if (!es || Date.now() - esSeen > 20000) { setHA(false); esConnect(true); }
+  refresh().catch(() => {});   // fresh data right away, not after the stream reconnects
+}
+$ha.onclick = () => { esConnect(true); refresh().catch(() => {}); };
+window.addEventListener('offline', () => { setHA(false); esDrop(); });
+window.addEventListener('online', () => esConnect(true));
+document.addEventListener('visibilitychange', wake);
+window.addEventListener('pageshow', (e) => { if (e.persisted) wake(); });
+window.addEventListener('focus', wake);
+setInterval(() => { if (!document.hidden && es && Date.now() - esSeen > 35000) { setHA(false); esConnect(true); } }, 5000);
 async function refresh() {
   let st;
   try { st = await api('GET', 'api/state'); } catch (e) { setHA(false); throw e; }
-  setHA(true);
   const before = histCacheKey(), wasWaiting = !$('statsLoading').hidden || !$('mapLoading').hidden;
   applyState(st);
   S.loaded = true;
@@ -601,4 +637,5 @@ $('signOut').onclick = async () => { try { await api('POST', 'api/drive/disconne
   try { await refresh(); if (!S.editId) { S.seat = S.cfg.seat; setSeg('seatSeg', S.seat); update(); } }
   catch (e) { setSync('bad', 'Cannot reach the add-on'); toast(e.message); }
   setInterval(() => { if (document.visibilityState === 'visible') refresh().catch(() => {}); }, 60000);
+  esConnect();
 })();
