@@ -469,24 +469,45 @@ def _gemini_error(e, model):
     }.get(e.status, f'Gemini error ({e.status}). {msg}')
 
 
+THINKING = {}   # model -> thinking settings to try, first one known to work
+
+
+def _thinking_options(model):
+    if model.startswith('gemini-2.5-flash'):
+        return [{'thinkingBudget': 0}, None]
+    if 'flash' in model:
+        return [{'thinkingLevel': 'minimal'}, {'thinkingLevel': 'low'}, None]
+    return [None]
+
+
 def gemini_scan(jpeg):
     o = options()
     if not o['gemini_api_key']:
         return 400, {'error': 'Add gemini_api_key in the add-on Configuration tab to scan.'}
     model = o['gemini_model']
     url = f"{GEMINI_BASE}/{urllib.parse.quote(model)}:generateContent?key={urllib.parse.quote(o['gemini_api_key'])}"
-    gen = {'responseMimeType': 'application/json', 'temperature': 0}
-    if 'flash' in model and (model.startswith('gemini-3') or model.startswith('gemini-4')):
-        gen['thinkingConfig'] = {'thinkingLevel': 'minimal'}   # reading a screen needs no reasoning
-    elif model.startswith('gemini-2.5-flash'):
-        gen['thinkingConfig'] = {'thinkingBudget': 0}          # 2.5 Flash thinks by default; off is much faster
-    body = json.dumps({
-        'contents': [{'role': 'user', 'parts': [{'text': SCAN_PROMPT}, {'inline_data': {'mime_type': 'image/jpeg', 'data': base64.b64encode(jpeg).decode()}}]}],
-        'generationConfig': gen,
-    }).encode()
+    image = {'inline_data': {'mime_type': 'image/jpeg', 'data': base64.b64encode(jpeg).decode()}}
+
+    def body_for(thinking):
+        gen = {'responseMimeType': 'application/json', 'temperature': 0}
+        if thinking:
+            gen['thinkingConfig'] = thinking
+        return json.dumps({'contents': [{'role': 'user', 'parts': [{'text': SCAN_PROMPT}, image]}], 'generationConfig': gen}).encode()
 
     def call():
-        return http('POST', url, body, {'Content-Type': 'application/json'}, timeout=GEMINI_LIMIT)[1]
+        # Least thinking the model accepts (reading a screen needs no reasoning). Models differ in which
+        # levels they take, so on a "not supported" answer try the next one and remember what worked.
+        opts = THINKING.get(model) or _thinking_options(model)
+        for k, thinking in enumerate(opts):
+            try:
+                res = http('POST', url, body_for(thinking), {'Content-Type': 'application/json'}, timeout=GEMINI_LIMIT)[1]
+                THINKING[model] = opts[k:]
+                return res
+            except HttpError as e:
+                if e.status == 400 and 'think' in (e.body or '').lower() and k + 1 < len(opts):
+                    log.info('Gemini %s: thinking setting %s not accepted, trying %s', model, thinking, opts[k + 1])
+                    continue
+                raise
 
     t0 = time.monotonic()
     pool = ThreadPoolExecutor(max_workers=len(HEDGE_AFTER))

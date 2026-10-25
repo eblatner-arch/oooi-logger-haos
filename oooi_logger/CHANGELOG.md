@@ -1,3 +1,6 @@
+## 2.9.3
+- Fix: Gemini models that don't take the "minimal" thinking level (such as gemini-3.8-flash) failed with "thinking level minimal not supported". Scans now fall back to the lowest level the model accepts (low, then the model's default) and remember it.
+
 ## 2.9.2
 - When `gemini_model` isn't available to your key, the scan error lists the Gemini Flash models your key can use (the full list goes to the Log tab).
 
