@@ -461,6 +461,8 @@ def gemini_scan(jpeg):
     gen = {'responseMimeType': 'application/json', 'temperature': 0}
     if 'flash' in model and (model.startswith('gemini-3') or model.startswith('gemini-4')):
         gen['thinkingConfig'] = {'thinkingLevel': 'minimal'}   # reading a screen needs no reasoning
+    elif model.startswith('gemini-2.5-flash'):
+        gen['thinkingConfig'] = {'thinkingBudget': 0}          # 2.5 Flash thinks by default; off is much faster
     body = json.dumps({
         'contents': [{'role': 'user', 'parts': [{'text': SCAN_PROMPT}, {'inline_data': {'mime_type': 'image/jpeg', 'data': base64.b64encode(jpeg).decode()}}]}],
         'generationConfig': gen,
