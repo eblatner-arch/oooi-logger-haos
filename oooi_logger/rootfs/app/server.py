@@ -438,6 +438,23 @@ HEDGE_AFTER = (0, 4, 9)
 GEMINI_LIMIT = 90
 
 
+def gemini_models_hint():
+    """'Your key can use: …' — the Flash models this key can actually call (from Google's model list)."""
+    o = options()
+    try:
+        _, body = http('GET', f"{GEMINI_BASE}?key={urllib.parse.quote(o['gemini_api_key'])}&pageSize=200", timeout=10)
+        names = [m['name'].split('/', 1)[-1] for m in json.loads(body).get('models', [])
+                 if 'generateContent' in (m.get('supportedGenerationMethods') or [])]
+        flash = sorted({n for n in names if 'flash' in n and 'image' not in n and 'tts' not in n and 'live' not in n
+                        and 'audio' not in n}, reverse=True)
+        if flash:
+            log.info('Gemini models this key can use: %s', ', '.join(names))
+            return 'Your key can use: ' + ', '.join(flash[:8]) + '. '
+    except Exception:
+        pass
+    return ''
+
+
 def _gemini_error(e, model):
     msg = ''
     try:
@@ -447,7 +464,7 @@ def _gemini_error(e, model):
     return {
         400: 'Gemini rejected the request. Check gemini_api_key in the add-on Configuration.' if 'key' in msg.lower() else f'Gemini error: {msg}',
         403: 'Gemini refused the key. Check it in the add-on Configuration.',
-        404: f'Gemini has no model named "{model}". Change gemini_model in the add-on Configuration.',
+        404: f'Gemini has no model named "{model}" for your key. {gemini_models_hint()}Change gemini_model in the add-on Configuration.',
         429: 'Gemini free-tier limit reached. Wait a minute and scan again.',
     }.get(e.status, f'Gemini error ({e.status}). {msg}')
 

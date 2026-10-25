@@ -1,3 +1,6 @@
+## 2.9.2
+- When `gemini_model` isn't available to your key, the scan error lists the Gemini Flash models your key can use (the full list goes to the Log tab).
+
 ## 2.9.1
 - With `gemini_model` set to a Gemini 2.5 Flash model, scans turn its thinking off (it thinks by default, which slows it down for no benefit when reading a screen).
 
