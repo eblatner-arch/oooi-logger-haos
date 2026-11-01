@@ -249,3 +249,7 @@ header.top { display: grid; gap: 12px; justify-content: stretch; align-items: st
 .habadge.flash .dot { animation: livepulse .9s ease-out; }
 @keyframes livepulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--good) 70%, transparent); } 100% { box-shadow: 0 0 0 9px transparent; } }
 .scantime { font-size: 12px; color: var(--muted); }
+
+/* PF split: takeoff and landing toggles under PF / PM (both on for PF; tap one off when the other pilot flew it) */
+.seg.ops { margin-top: 8px; }
+.seg.ops button { font-size: 15px; padding: 9px 6px; }

@@ -105,6 +105,11 @@ function resolveTimes(f) {
   return t;
 }
 
+// PF logs the takeoff and the landing unless one was handed to the other pilot
+// (takeoff: false / landing: false, keep in step with flightmath.py); PM logs neither.
+const didTakeoff = (f) => (f.duty || 'PF') === 'PF' && f.takeoff !== false;
+const didLanding = (f) => (f.duty || 'PF') === 'PF' && f.landing !== false;
+
 const hrs = (min) => Math.round(min / 60 * 100) / 100;
 
 function compute(f) {
@@ -125,12 +130,12 @@ function compute(f) {
   r.nightTO = isNightOp(t.off, a);
   r.nightLdg = isNightOp(t.on, b);
   r.distNm = Math.round(distNm(a, b));
-  const pf = (f.duty || 'PF') === 'PF';
-  r.landings = pf ? 1 : 0;
-  r.fsNight = pf && r.nightLdg ? 1 : 0;
-  r.fsDay = pf && !r.nightLdg ? 1 : 0;
-  r.takeoffs = pf ? 1 : 0;
-  r.nightTakeoffs = pf && r.nightTO ? 1 : 0;
+  const to = didTakeoff(f), ldg = didLanding(f);
+  r.landings = ldg ? 1 : 0;
+  r.fsNight = ldg && r.nightLdg ? 1 : 0;
+  r.fsDay = ldg && !r.nightLdg ? 1 : 0;
+  r.takeoffs = to ? 1 : 0;
+  r.nightTakeoffs = to && r.nightTO ? 1 : 0;
   r.ok = true;
   return r;
 }

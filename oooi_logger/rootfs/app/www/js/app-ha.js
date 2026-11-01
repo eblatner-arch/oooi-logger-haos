@@ -15,7 +15,7 @@ const api = async (method, path, body, raw) => {
 const $ = (id) => document.getElementById(id);
 const FIELDS = ['date', 'flightNumber', 'tail', 'from', 'to', 'crew', 'out', 'off', 'on', 'in', 'comments'];
 const S = {
-  duty: 'PF', seat: 'PIC', editId: null, flights: [],
+  duty: 'PF', to: true, ldg: true, seat: 'PIC', editId: null, flights: [],
   cfg: { seat: 'PIC', anonTail: '#002377', model: 'B737' },
   drive: {}, scan: {}, scannedTrip: null, poll: null,
 };
@@ -23,6 +23,8 @@ const fmtHM = (min) => (min == null || isNaN(min) ? '--:--' : `${String(Math.flo
 const todayLocal = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 function toast(t) { const el = $('toast'); el.textContent = t; el.hidden = false; clearTimeout(toast._t); toast._t = setTimeout(() => (el.hidden = true), 3200); }
 const fltNo = (n) => `Flt ${n}`;
+// PF, PF · T/O (took off, other pilot landed), PF · LDG (landed only), or PM
+const dutyLabel = (f) => ((f.duty || 'PF') !== 'PF' ? 'PM' : didTakeoff(f) && didLanding(f) ? 'PF' : didTakeoff(f) ? 'PF · T/O' : didLanding(f) ? 'PF · LDG' : 'PM');
 // Times on screen are hours:minutes (3:10) unless Settings → Show hours as is set to decimal.
 // The CSVs always use decimal hours, which is what MyFlightbook imports.
 const fmtMin = (min) => {
@@ -48,6 +50,7 @@ function readForm() {
   f.from = f.from.toUpperCase(); f.to = f.to.toUpperCase(); f.tail = f.tail.toUpperCase();
   for (const k of ['crew', 'out', 'off', 'on', 'in']) f[k] = f[k].replace(/[^0-9]/g, '');
   f.approaches = 0; f.duty = S.duty; f.seat = S.seat;
+  f.takeoff = S.duty === 'PF' && S.to; f.landing = S.duty === 'PF' && S.ldg;
   f.extra = {}; f.override = {};
   for (const el of $('customFields').querySelectorAll('input')) {
     const v = el.value.trim(); if (!v) continue;
@@ -109,7 +112,7 @@ function refreshAutoValues(f) {
 function fillForm(f) {
   for (const k of FIELDS) $(k).value = f[k] ?? '';
   fillCustomFields(f);
-  S.duty = f.duty || 'PF'; S.seat = f.seat || S.cfg.seat; setSeg('dutySeg', S.duty); setSeg('seatSeg', S.seat);
+  S.duty = f.duty || 'PF'; S.to = didTakeoff(f); S.ldg = didLanding(f); S.seat = f.seat || S.cfg.seat; setSeg('dutySeg', S.duty); setOps(); setSeg('seatSeg', S.seat);
   update();
 }
 function formIsEmpty() { const f = readForm(); return !f.flightNumber && !f.tail && !f.from && !f.to && !f.out && !f.off && !f.on && !f.in && !f.crew && !f.comments; }
@@ -156,8 +159,10 @@ function update() {
   }
   const chips = document.createElement('div'); chips.className = 'chips'; chips.style.marginTop = '12px';
   const chip = (txt, cls) => { const c = document.createElement('span'); c.className = 'chip ' + (cls || ''); c.textContent = txt; chips.appendChild(c); };
-  if (S.duty === 'PF') { chip(r.nightTO ? 'Night takeoff' : 'Day takeoff', r.nightTO ? 'night' : 'day'); chip(r.nightLdg ? 'Night FS landing' : 'Day FS landing', r.nightLdg ? 'night' : 'day'); }
-  else chip('PM · no takeoff or landing');
+  if (S.duty === 'PF') {
+    if (S.to) chip(r.nightTO ? 'Night takeoff' : 'Day takeoff', r.nightTO ? 'night' : 'day'); else chip('Takeoff by other pilot');
+    if (S.ldg) chip(r.nightLdg ? 'Night FS landing' : 'Day FS landing', r.nightLdg ? 'night' : 'day'); else chip('Landing by other pilot');
+  } else chip('PM · no takeoff or landing');
   if (f.flightNumber) chip(fltNo(f.flightNumber));
   if (f.tail) chip(f.tail);
   out.append(calc, chips);
@@ -182,7 +187,27 @@ $('nightBack').onclick = () => show('log');
 $('showWork').onclick = () => show('night');
 for (const k of FIELDS) $(k).addEventListener('input', update);
 $('date').addEventListener('change', update);
-$('dutySeg').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; S.duty = b.dataset.v; setSeg('dutySeg', S.duty); update(); };
+// PF turns on both the takeoff and the landing; tap one off when the other pilot flew it (some
+// airports need the captain to). Both off is PM; turning one on from PM makes it PF.
+function setOps() {
+  for (const b of $('opsSeg').querySelectorAll('button')) b.setAttribute('aria-pressed', String(b.dataset.v === 'to' ? S.to : S.ldg));
+  const f = { from: $('from').value.trim().toUpperCase(), to: $('to').value.trim().toUpperCase() };
+  $('opsToAt').textContent = S.to ? `You fly it${f.from.length === 4 ? ' at ' + f.from : ''}` : 'Other pilot';
+  $('opsLdgAt').textContent = S.ldg ? `You fly it${f.to.length === 4 ? ' at ' + f.to : ''}` : 'Other pilot';
+}
+$('dutySeg').onclick = (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  S.duty = b.dataset.v; S.to = S.ldg = S.duty === 'PF';
+  setSeg('dutySeg', S.duty); setOps(); update();
+};
+$('opsSeg').onclick = (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (S.duty === 'PM') { S.to = S.ldg = false; }
+  if (b.dataset.v === 'to') S.to = !S.to; else S.ldg = !S.ldg;
+  S.duty = S.to || S.ldg ? 'PF' : 'PM';
+  setSeg('dutySeg', S.duty); setOps(); update();
+};
+for (const k of ['from', 'to']) $(k).addEventListener('input', setOps);
 $('seatSeg').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; S.seat = b.dataset.v; setSeg('seatSeg', S.seat); update(); };
 $('defSeatSeg').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; setSeg('defSeatSeg', b.dataset.v); };
 $('cancelEdit').onclick = () => newFlight(false);
@@ -337,9 +362,9 @@ function renderList() {
     const tm = document.createElement('div'); tm.className = 'time'; tm.textContent = r.ok ? fmtMin(r.totalMin) : '—';
     const chips = document.createElement('div'); chips.className = 'chips';
     const chip = (t, c) => { const s = document.createElement('span'); s.className = 'chip ' + (c || ''); s.textContent = t; chips.appendChild(s); };
-    chip(f.duty || 'PF', f.duty === 'PM' ? '' : 'pf');
+    chip(dutyLabel(f), f.duty === 'PM' ? '' : 'pf');
     if (r.ok && r.nightMin) chip(`Night ${fmtMin(r.nightMin)}`, 'night');
-    if (r.ok && f.duty === 'PF' && r.nightLdg) chip('Night ldg', 'night');
+    if (r.ok && didLanding(f) && r.nightLdg) chip('Night ldg', 'night');
     chip(f.imported ? 'Imported' : 'Pending', f.imported ? 'ok' : 'pend');
     b.append(left, tm, chips);
     b.onclick = () => editFlight(f.id);

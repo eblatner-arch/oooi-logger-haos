@@ -7,7 +7,7 @@ Log airline flights from the ACARS-PREVIOUS OOOI page and import them into MyFli
 - **Flight Log** appears in the Home Assistant sidebar (and the Companion app).
 - Scan the OOOI page with your phone camera. Gemini reads it on the add-on side, and the TRIP check confirms CREW→IN.
 - Total = CREW→IN. Night = minutes from OUT to IN with the sun below −6° along the great-circle route.
-  PF logs a takeoff and a full-stop landing, marked day or night per 14 CFR 61.57(b).
+  PF logs a takeoff and a full-stop landing, marked day or night per 14 CFR 61.57(b). Tap **Takeoff** or **Landing** off under PF when the other pilot flew that part.
 - Every change writes these files to `/share/oooi_logger/` and, when connected, to Google Drive:
   - `MyFlightbook Import – pending.csv`: flights not yet imported
   - `Flight Log – all flights.csv`: everything

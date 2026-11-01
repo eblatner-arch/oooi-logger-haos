@@ -69,7 +69,7 @@ function appEntries() {
     const ov = f.override || {}, get = (k) => (k in ov ? ov[k] : vals[k]), n = (k) => +get(k) || 0, h = (k) => qm(get(k));
     out.push({ d: f.date, r: [apCode(f.from), apCode(f.to)], t: h('Total Flight Time'), pic: h('PIC'), sic: h('SIC'), n: h('Night'), x: h('X-Country'),
       l: n('Landings'), ld: n('FS Day Landings'), ln: n('FS Night Landings'), to: n('Takeoffs (any)'), ton: n('Takeoffs - Night'),
-      reg: f.tail || '', m: S.cfg.model, fn: f.flightNumber || '', src: 'app', id: f.id, duty: f.duty || 'PF' });
+      reg: f.tail || '', m: S.cfg.model, fn: f.flightNumber || '', src: 'app', id: f.id, duty: dutyLabel(f) });
   }
   return out;
 }
@@ -552,7 +552,7 @@ function findRow(e) {
   const chips = document.createElement('div'); chips.className = 'chips';
   const chip = (t, c) => { const s = document.createElement('span'); s.className = 'chip ' + (c || ''); s.textContent = t; chips.appendChild(s); };
   if (e.sim) chip('Sim');
-  else if (e.duty) chip(e.duty, e.duty === 'PF' ? 'pf' : '');
+  else if (e.duty) chip(e.duty, e.duty.startsWith('PF') ? 'pf' : '');
   else if (e.l) chip(`${e.l} ldg`);
   if (e.n > 0) chip(`Night ${fmtH(e.n)}`, 'night');
   if (e.ln > 0) chip('Night ldg', 'night');

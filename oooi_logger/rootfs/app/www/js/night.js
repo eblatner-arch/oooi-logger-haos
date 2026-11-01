@@ -178,7 +178,9 @@ function drawOps(f, r, t, a, b) {
     }
     add('Sun at ' + kind.toLowerCase(), `${sunAlt(ms, ap.lat, ap.lon).toFixed(1)}°`);
     const note = document.createElement('div'); note.className = 'small';
-    note.textContent = f.duty === 'PF' ? (isNight ? `Logged as a night ${kind.toLowerCase()}.` : `Logged as a day ${kind.toLowerCase()}.`) : `You were PM, so no ${kind.toLowerCase()} is logged.`;
+    const did = kind === 'Takeoff' ? didTakeoff(f) : didLanding(f);
+    note.textContent = did ? (isNight ? `Logged as a night ${kind.toLowerCase()}.` : `Logged as a day ${kind.toLowerCase()}.`)
+      : f.duty === 'PF' ? `The other pilot flew the ${kind.toLowerCase()}, so none is logged.` : `You were PM, so no ${kind.toLowerCase()} is logged.`;
     card.append(head, dl, note);
     box.appendChild(card);
   }

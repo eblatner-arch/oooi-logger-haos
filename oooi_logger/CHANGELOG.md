@@ -1,3 +1,7 @@
+## 2.10.0
+- **PF takeoff and landing, separately.** Under PF / PM there are now **Takeoff** and **Landing** buttons. PF turns both on; tap one off when the other pilot flew it (for example where the captain has to do the takeoff or landing). Only what you flew is logged: takeoffs, night takeoffs, and day or night full-stop landings. Turning both off makes it PM; turning one on from PM makes it PF.
+- The Flights list shows **PF · T/O** or **PF · LDG** for a split leg, and the night breakdown says when the other pilot flew the takeoff or landing.
+
 ## 2.9.3
 - Fix: Gemini models that don't take the "minimal" thinking level (such as gemini-3.8-flash) failed with "thinking level minimal not supported". Scans now fall back to the lowest level the model accepts (low, then the model's default) and remember it.
 
