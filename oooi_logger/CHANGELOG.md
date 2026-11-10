@@ -1,3 +1,7 @@
+## 2.10.1
+- Night time now runs from **CREW to IN** (the TRIP time), the same span as total time, instead of OUT to IN. A leg flown entirely at night now logs night equal to its total time. The night breakdown's chart and stats start at CREW too.
+- Flights already saved are recalculated the next time the CSVs are written (any change, or Sync now).
+
 ## 2.10.0
 - **PF takeoff and landing, separately.** Under PF / PM there are now **Takeoff** and **Landing** buttons. PF turns both on; tap one off when the other pilot flew it (for example where the captain has to do the takeoff or landing). Only what you flew is logged: takeoffs, night takeoffs, and day or night full-stop landings. Turning both off makes it PM; turning one on from PM makes it PF.
 - The Flights list shows **PF · T/O** or **PF · LDG** for a split leg, and the night breakdown says when the other pilot flew the takeoff or landing.

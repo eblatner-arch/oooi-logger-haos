@@ -50,7 +50,8 @@ function distNm(a, b) {
 function nightMinutes(t, a, b) {
   let n = 0;
   const span = t.on - t.off;
-  for (let s = t.out; s < t.in; s += 60000) {
+  // From CREW (trip start, same as total time) to IN; OUT if no CREW time.
+  for (let s = t.crew != null ? t.crew : t.out; s < t.in; s += 60000) {
     const m = s + 30000;
     const f = span > 0 ? Math.min(Math.max((m - t.off) / span, 0), 1) : 0;
     const p = gcPoint(a, b, f);

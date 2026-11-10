@@ -5,7 +5,7 @@ const zt = (ms) => { const d = new Date(ms); return `${String(d.getUTCHours()).p
 
 function trackSamples(t, a, b) {
   const out = [], span = t.on - t.off;
-  for (let s = t.out; s < t.in; s += 60000) {
+  for (let s = t.crew != null ? t.crew : t.out; s < t.in; s += 60000) {
     const m = s + 30000;
     const f = span > 0 ? Math.min(Math.max((m - t.off) / span, 0), 1) : 0;
     const p = gcPoint(a, b, f);
@@ -46,7 +46,7 @@ function renderNight() {
   $('nDate').textContent = new Date(f.date + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
 
   const st = $('nStats'); st.innerHTML = '';
-  for (const [v, l] of [[fmtMin(r.nightMin), 'Night'], [fmtMin(r.blockMin), 'Block, OUT→IN'], [`${r.distNm}`, 'Great circle nm']]) {
+  for (const [v, l] of [[fmtMin(r.nightMin), 'Night'], [fmtMin(r.totalMin), 'Trip, CREW→IN'], [`${r.distNm}`, 'Great circle nm']]) {
     const d = document.createElement('div'); d.className = 'stat'; const bb = document.createElement('b'); bb.textContent = v; const sp = document.createElement('span'); sp.textContent = l; d.append(bb, sp); st.appendChild(d);
   }
   // night segments
@@ -69,7 +69,8 @@ function drawChart(smp, t) {
   svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
   let lo = Math.min(-10, ...smp.map((s) => s.alt)), hi = Math.max(5, ...smp.map((s) => s.alt));
   lo = Math.floor(lo / 5) * 5; hi = Math.ceil(hi / 5) * 5;
-  const x = (ms) => L + (ms - t.out) / (t.in - t.out) * (W - L - R);
+  const t0 = t.crew != null ? t.crew : t.out;
+  const x = (ms) => L + (ms - t0) / (t.in - t0) * (W - L - R);
   const y = (v) => T + (hi - v) / (hi - lo) * (H - T - B);
   const css = (n) => `var(${n})`;
   // night band
@@ -90,7 +91,7 @@ function drawChart(smp, t) {
   const offX = x(t.off), onX = x(t.on);
   svg.appendChild(el('text', { x: Math.max(offX, L), y: 12, 'text-anchor': 'start', 'font-size': 10, fill: css('--ink'), 'font-family': 'var(--f-mono)' }, 'OFF ' + zt(t.off)));
   svg.appendChild(el('text', { x: Math.min(onX, W - R), y: 12, 'text-anchor': 'end', 'font-size': 10, fill: css('--ink'), 'font-family': 'var(--f-mono)' }, 'ON ' + zt(t.on)));
-  svg.appendChild(el('text', { x: L, y: H - 8, 'text-anchor': 'start', 'font-size': 10, fill: css('--muted'), 'font-family': 'var(--f-mono)' }, 'OUT ' + zt(t.out)));
+  svg.appendChild(el('text', { x: L, y: H - 8, 'text-anchor': 'start', 'font-size': 10, fill: css('--muted'), 'font-family': 'var(--f-mono)' }, (t.crew != null ? 'CREW ' : 'OUT ') + zt(t0)));
   svg.appendChild(el('text', { x: W - R, y: H - 8, 'text-anchor': 'end', 'font-size': 10, fill: css('--muted'), 'font-family': 'var(--f-mono)' }, 'IN ' + zt(t.in)));
   // elevation line, colored by state
   const col = (v) => (v < -6 ? '--night' : v < -0.833 ? '--twi' : '--day');
