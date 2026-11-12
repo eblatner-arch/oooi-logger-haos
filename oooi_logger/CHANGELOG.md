@@ -1,3 +1,8 @@
+## 2.11.2
+- When every Gemini model answers "high demand", the add-on waits 3 seconds and tries them all once more before giving up (busy spells are often short).
+- Default backup list is now `gemini-3.6-flash, gemini-3.8-flash, gemini-3.7-flash`.
+- The busy message no longer suggests adding a Claude key.
+
 ## 2.11.1
 - `gemini_backup_model` takes a list (comma-separated), tried in order. The default is now `gemini-3.6-flash, gemini-3.8-flash`, so a scan gets three Gemini models before giving up.
 - When every Gemini model is busy you get one clear message ("Gemini is busy right now (3.5-flash, 3.6-flash: high demand). Scan again in a minute…") instead of the same sentence repeated per model.
