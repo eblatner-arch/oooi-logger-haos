@@ -1,5 +1,5 @@
 name: OOOI Flight Logger
-version: "2.10.1"
+version: "2.11.0"
 slug: oooi_logger
 description: Scan the ACARS OOOI page, work out night time, keep MyFlightbook import CSVs, and see your stats, currency and route map.
 url: https://github.com/eblatner-arch/oooi-logger-haos
@@ -24,6 +24,7 @@ map:
 options:
   gemini_api_key: ""
   gemini_model: gemini-3.5-flash-lite
+  gemini_backup_model: gemini-3.6-flash
   anthropic_api_key: ""
   claude_model: claude-haiku-5-5
   claude_check_model: claude-sonnet-5-5
@@ -35,6 +36,7 @@ options:
 schema:
   gemini_api_key: password?
   gemini_model: str
+  gemini_backup_model: str?
   anthropic_api_key: password?
   claude_model: str?
   claude_check_model: str?

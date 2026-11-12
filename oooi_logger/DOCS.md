@@ -44,6 +44,7 @@ The history is also kept on your phone, so Stats and Map open instantly (even of
 |---|---|
 | `gemini_api_key` | Key from Google AI Studio. Needed for photo scanning. Stays on your HA box. |
 | `gemini_model` | Gemini model ID. Default `gemini-3.5-flash-lite`. |
+| `gemini_backup_model` | A second Gemini model, tried when the first is busy ("high demand"), out of free quota, or its read doesn't check out. Default `gemini-3.6-flash`. Leave empty to skip. Use a model from the list Gemini's error shows for your key. |
 | `anthropic_api_key` | Key from the Anthropic Console, to scan with Claude (optional). Stays on your HA box. |
 | `claude_model` | Claude model that reads each photo first. Default `claude-haiku-5-5` (fast). |
 | `claude_check_model` | Claude model that takes a second look when the first read doesn't check out. Default `claude-sonnet-5-5`. Leave empty to skip. |

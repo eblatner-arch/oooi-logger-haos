@@ -1,3 +1,8 @@
+## 2.11.0
+- **Backup Gemini model.** New option `gemini_backup_model` (default `gemini-3.6-flash`). When the main Gemini model is busy ("high demand"), out of free quota, or its read doesn't check out, the backup model reads the photo right away. Each model has its own queue and its own free quota.
+- A busy model no longer waits for the 4 s and 9 s resends; the scan moves straight on to the next reader.
+- The scan timer names the Gemini model that answered (for example "Gemini 3.6-flash (backup) · Gemini 3.5-flash-lite failed (busy)").
+
 ## 2.10.1
 - Night time now runs from **CREW to IN** (the TRIP time), the same span as total time, instead of OUT to IN. A leg flown entirely at night now logs night equal to its total time. The night breakdown's chart and stats start at CREW too.
 - Flights already saved are recalculated the next time the CSVs are written (any change, or Sync now).
